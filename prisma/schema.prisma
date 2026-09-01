@@ -1,0 +1,344 @@
+// Prisma schema for the recipe planner.
+// Single-user app, SQLite file database, no auth.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  DRINK
+  BAKING
+  SIDE
+  SAUCE_CONDIMENT
+  OTHER
+}
+
+enum StockLevel {
+  PLENTY
+  LOW
+  OUT
+}
+
+enum IngredientCategory {
+  PRODUCE
+  MEAT_FISH
+  DAIRY
+  DRY_GOODS
+  TINS_JARS
+  SPICES
+  FROZEN
+  OTHER
+}
+
+enum ShoppingItemOrigin {
+  RECIPE
+  MANUAL
+  LOW_STOCK
+}
+
+enum Unit {
+  g
+  kg
+  ml
+  l
+  tsp
+  tbsp
+  cup
+  piece
+}
+
+enum ProductSource {
+  OPEN_FOOD_FACTS
+  MANUAL
+}
+
+enum ClaimType {
+  CERTIFIED
+  REGULATED
+  UNREGULATED
+}
+
+// Canonical ingredient. Everything else (recipes, pantry, synonyms) points here.
+model Ingredient {
+  id            String             @id @default(cuid())
+  name          String             @unique
+  plural        String?
+  isStaple      Boolean            @default(false)
+  category      IngredientCategory @default(OTHER)
+  // User-written override. When set, takes priority over the static lookup
+  // in lib/storageAdvice.ts.
+  storageAdvice String?
+
+  // Descriptive-only tags for the dashboard's nutrition-ish nudges. No
+  // scores, no targets, just facts to mention.
+  isHighFibre  Boolean @default(false)
+  isWholegrain Boolean @default(false)
+  isLegume     Boolean @default(false)
+  isLeafyGreen Boolean @default(false)
+  isOilyFish   Boolean @default(false)
+
+  synonyms           IngredientSynonym[]
+  recipeIngredients  RecipeIngredient[]
+  pantryItem         PantryItem?
+  productIngredients ProductIngredient[]
+  info               IngredientInfo?
+  shoppingListItems  ShoppingListItem[]
+
+  // "Satisfies" means having this ingredient means I don't need the other,
+  // e.g. unsalted butter satisfies butter. Distinct from IngredientSynonym,
+  // which means "same thing, different name". Self-relation, many-to-many:
+  // `satisfies` is what this ingredient can stand in for, `satisfiedBy` is
+  // what can stand in for this one.
+  satisfies   Ingredient[] @relation("IngredientSatisfies")
+  satisfiedBy Ingredient[] @relation("IngredientSatisfies")
+
+  @@index([name])
+}
+
+// Alternative names that resolve to a canonical ingredient, e.g. "scallion" -> "spring onion".
+// Grown manually over time as imports throw up new names.
+model IngredientSynonym {
+  id           String @id @default(cuid())
+  name         String @unique
+  ingredientId String
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([ingredientId])
+}
+
+model Recipe {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  servings       Int?
+  // Ordered list of instruction steps, stored as a JSON string:
+  // { text: string, timerSeconds?: number, ingredientIds?: string[] }[]
+  instructions   String
+  totalTimeMins  Int?
+  activeTimeMins Int?
+  batchFriendly  Boolean  @default(false)
+  leftoverNote   String?
+  mealType       MealType @default(DINNER)
+  // URL the recipe was imported from, or free text ("Mum's recipe book").
+  source         String?
+  // Set from the JSON-LD `image` field on import. Manual recipes leave this
+  // unset and get a deterministic colour block in the UI instead.
+  imageUrl       String?
+  createdAt      DateTime @default(now())
+
+  ingredients     RecipeIngredient[]
+  mealPlanEntries MealPlanEntry[]
+  cookLogs        CookLog[]
+}
+
+// One entry per time a recipe gets cooked. No UI beyond a single "Cooked it"
+// button yet, this is just accumulating data for a planner later.
+model CookLog {
+  id       String   @id @default(cuid())
+  recipeId String
+  cookedAt DateTime @default(now())
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+}
+
+// Joins a Recipe to a canonical Ingredient with quantity/unit/note.
+// Quantity is never a freeform string so shopping-list math stays possible.
+model RecipeIngredient {
+  id           String  @id @default(cuid())
+  recipeId     String
+  ingredientId String
+  quantity     Float?
+  unit         Unit?
+  // e.g. "finely chopped", "plus extra to serve"
+  note         String?
+  optional     Boolean @default(false)
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@index([recipeId])
+  @@index([ingredientId])
+}
+
+// Ingredients currently in stock, with a rough stock level rather than a
+// quantity. OUT is kept in the list (not deleted) so it's still there to
+// bump back up to PLENTY once restocked.
+model PantryItem {
+  id           String     @id @default(cuid())
+  ingredientId String     @unique
+  stockLevel   StockLevel @default(PLENTY)
+  // Set when this stock was recorded from a specific scanned product,
+  // e.g. "the tomatoes I have are that jar", rather than a generic ingredient.
+  productId    String?
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  product    Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+}
+
+// A packaged product identified by barcode, looked up against Open Food Facts
+// or entered by hand. Composition only, no scoring, ratings, or judgement.
+model Product {
+  id                  String        @id @default(cuid())
+  barcode             String        @unique
+  name                String
+  brand               String?
+  rawIngredientsText  String?
+  // Set when the ingredient text we stored isn't in English, so the UI can
+  // explain why matching against the canonical catalog is likely to fail.
+  ingredientsLanguage String?
+  countryOfOrigin     String?
+  // Raw countries_tags from the source, e.g. ["en:united-kingdom", "en:france"],
+  // kept alongside countryOfOrigin so the flag emoji can be derived from the
+  // ISO code rather than parsed back out of a human-readable string.
+  countryTags         Json?
+  // Raw nutriments blob as returned by the source, e.g. { "energy-kcal": 250, "fat": 12.3, ... }
+  nutritionPer100g    Json?
+  imageUrl            String?
+  source              ProductSource
+  firstScannedAt      DateTime      @default(now())
+  lastScannedAt       DateTime      @default(now())
+
+  ingredients ProductIngredient[]
+  pantryItems PantryItem[]
+  claims      ProductClaim[]
+  snapshots   ProductSnapshot[]
+
+  @@index([barcode])
+}
+
+// A front-of-pack claim (e.g. "Fairtrade", "Free Range") matched against the
+// static lookup in lib/claims.ts at scan time, or added by hand when the
+// text isn't in Open Food Facts' data at all.
+model ProductClaim {
+  id          String    @id @default(cuid())
+  productId   String
+  claimText   String
+  claimType   ClaimType
+  explanation String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// A point-in-time capture of a product's label data, written on every scan.
+// A new snapshot is only kept when the ingredient text actually changed
+// since the last one, so this accumulates real history rather than noise.
+// No timeline UI yet, this is just so the data exists to build one later.
+model ProductSnapshot {
+  id                 String   @id @default(cuid())
+  productId          String
+  capturedAt         DateTime @default(now())
+  rawIngredientsText String?
+  nutritionPer100g   Json?
+  sourceRevision     String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// One parsed line from a product's ingredients label.
+model ProductIngredient {
+  id            String  @id @default(cuid())
+  productId     String
+  // Position in the label, preserved because ingredient lists are ordered by weight.
+  position      Int
+  rawText       String
+  ingredientId  String?
+  eNumber       String?
+  // Declared proportion only, e.g. "Potato (88%)" -> 88.0. Never OFF's own
+  // percent_estimate/percent_min/percent_max guesses.
+  percentage    Float?
+  // The category header this line was parsed out from, e.g. "Sweeteners"
+  // for an ingredient parsed out of "Sweeteners (Sorbitol, Aspartame)".
+  // When a header has nothing in brackets after it, it's kept as its own
+  // row with rawText equal to this same value, a function with no real
+  // ingredient name, styled differently and not numbered.
+  functionLabel String?
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([ingredientId])
+}
+
+// Notes on what a canonical ingredient (typically an additive) is and does.
+// Starts empty; filled in by hand over time. No scoring, just explanation.
+model IngredientInfo {
+  id            String  @id @default(cuid())
+  ingredientId  String  @unique
+  // e.g. "thickener", "raising agent", "preservative"
+  functionLabel String?
+  // One or two sentences on what it is and what it's doing in this product.
+  plainEnglish  String?
+  eNumber       String?
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+}
+
+// The single ongoing shopping list. Recipe- and low-stock-derived rows are
+// kept in sync with current recipe selection and pantry state (upserted by
+// ingredient + origin); manual rows are freeform and never resolved to a
+// canonical ingredient.
+model ShoppingListItem {
+  id                   String             @id @default(cuid())
+  name                 String
+  // Free text for all origins, e.g. "550 g" or "a bunch" - recipe-derived
+  // items just have their summed amount formatted into this same field.
+  quantityText         String?
+  // A manual edit to the quantity. Takes priority over quantityText for
+  // display, but doesn't overwrite it, so a recipe-derived amount stays
+  // visible underneath until the override is cleared. A resync only ever
+  // touches quantityText, never this.
+  overrideQuantityText String?
+  origin               ShoppingItemOrigin
+  checked              Boolean            @default(false)
+  ingredientId         String?
+  createdAt            DateTime           @default(now())
+
+  ingredient Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  @@unique([ingredientId, origin])
+  @@index([ingredientId])
+}
+
+// A week of dinner planning, one entry per day. UI comes later; modelled now.
+model MealPlan {
+  id        String   @id @default(cuid())
+  startDate DateTime
+  createdAt DateTime @default(now())
+
+  entries MealPlanEntry[]
+}
+
+model MealPlanEntry {
+  id         String   @id @default(cuid())
+  mealPlanId String
+  // Day this entry falls on, so entries can be reordered without reindexing.
+  date       DateTime
+  recipeId   String?
+  // True if this recipe was suggested then rejected during regeneration,
+  // kept so the regenerator can avoid repeating recent vetoes.
+  vetoed     Boolean  @default(false)
+
+  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipe   Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([mealPlanId])
+}
