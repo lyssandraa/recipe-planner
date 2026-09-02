@@ -1,36 +1,31 @@
 import Link from "next/link";
-import {
-  IconApple,
-  IconBaguette,
-  IconCake,
-  IconChefHat,
-  IconCup,
-  IconEgg,
-  IconShoppingBag,
-  IconToolsKitchen2,
-} from "@tabler/icons-react";
+import { IconSettings } from "@tabler/icons-react";
 import { prisma } from "@/lib/prisma";
 import { USER_NAME } from "@/lib/config";
-import { getGreeting } from "@/lib/greeting";
+import { getGreeting, getDayTimeLine } from "@/lib/greeting";
 import { getEffortLabel, getHandsOnLine } from "@/lib/effort";
 import { getMissingIngredients } from "@/lib/matching";
 import { getPantryStockSets } from "@/lib/pantryStock";
 import { isGoodTodaySuggestion } from "@/lib/suggestions";
 import { summarizeWeeklyTags, NUTRITION_TAG_LABELS } from "@/lib/nutritionTags";
+import { getCardColorClass, getRecipeEmoji } from "@/lib/recipeVisuals";
+import { MOOD_ORDER, MOOD_LABELS, MOOD_EMOJI, MOOD_CHIP_CLASS } from "@/lib/tags";
 import TodaySuggestionCard from "./today-suggestion-card";
+import DashboardSearch from "./dashboard-search";
 
 export const dynamic = "force-dynamic";
 
-// Six tiles max on the dashboard. The remaining meal types (Side, Sauce or
-// condiment, Other) are reachable via the recipe list's own mealType filter
-// instead of taking up more of the home screen.
+// The remaining meal types (Side, Sauce or condiment, Other, Component) are
+// reachable via the recipe list's own filters instead of taking up more of
+// the home screen. Components specifically are just a filter chip there,
+// not a dashboard destination, they're not a meal you'd plan around.
 const TILES = [
-  { mealType: "BREAKFAST", label: "Breakfast", icon: IconEgg, className: "bg-mint" },
-  { mealType: "LUNCH", label: "Lunch", icon: IconBaguette, className: "bg-peridot" },
-  { mealType: "DINNER", label: "Dinner", icon: IconToolsKitchen2, className: "bg-sage-light" },
-  { mealType: "SNACK", label: "Snacks", icon: IconApple, className: "bg-peridot-tint" },
-  { mealType: "DRINK", label: "Drinks", icon: IconCup, className: "bg-mint" },
-  { mealType: "BAKING", label: "Baking", icon: IconCake, className: "bg-peridot" },
+  { mealType: "BREAKFAST", label: "Breakfast", emoji: "🍳", tint: "bg-amber-tint", text: "text-ink" },
+  { mealType: "LUNCH", label: "Lunch", emoji: "🥪", tint: "bg-terracotta-tint", text: "text-ink" },
+  { mealType: "DINNER", label: "Dinner", emoji: "🍽️", tint: "bg-green-deep", text: "text-white" },
+  { mealType: "SNACK", label: "Snacks", emoji: "🍎", tint: "bg-teal-tint", text: "text-ink" },
+  { mealType: "DRINK", label: "Drinks", emoji: "🥤", tint: "bg-lime-tint", text: "text-ink" },
+  { mealType: "BAKING", label: "Baking", emoji: "🧁", tint: "bg-pink-tint", text: "text-ink" },
 ] as const;
 
 export default async function HomePage() {
@@ -63,11 +58,15 @@ export default async function HomePage() {
       wellStockedSet,
       lowOrOutSet
     ).length;
+    const ingredientNames = recipe.ingredients.map((ri) => ri.ingredient.name);
     return {
       id: recipe.id,
       title: recipe.title,
       effort: getEffortLabel(recipe.activeTimeMins, recipe.totalTimeMins),
       timeLine: getHandsOnLine(recipe),
+      batchFriendly: recipe.batchFriendly,
+      emoji: getRecipeEmoji({ title: recipe.title, mealType: recipe.mealType, ingredientNames }),
+      colorClass: getCardColorClass(recipe.id),
       missingCount,
       lastCookedAt: lastCookedByRecipe.get(recipe.id) ?? null,
     };
@@ -79,7 +78,15 @@ export default async function HomePage() {
   const todayCandidates = dinnersWithReadiness
     .filter((r) => r.missingCount === 0)
     .filter((r) => isGoodTodaySuggestion(r, now))
-    .map((r) => ({ id: r.id, title: r.title, effort: r.effort, timeLine: r.timeLine }));
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      effort: r.effort,
+      timeLine: r.timeLine,
+      batchFriendly: r.batchFriendly,
+      emoji: r.emoji,
+      colorClass: r.colorClass,
+    }));
 
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const recentCookLogs = await prisma.cookLog.findMany({
@@ -99,72 +106,137 @@ export default async function HomePage() {
   );
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-semibold text-sage-darker">
-        {getGreeting(USER_NAME)}
-      </h1>
-      <p className="mt-1 text-sm text-text-muted">Ready to cook?</p>
+    <div>
+      <header className="relative overflow-hidden bg-green-deep px-4 pt-6 pb-8">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-10 -right-8 h-32 w-32 rounded-full bg-amber opacity-30"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-lime opacity-25"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-2 right-24 h-14 w-14 rounded-full bg-terracotta opacity-[0.22]"
+        />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-wide text-white/70 uppercase">
+              {getDayTimeLine(now)}
+            </p>
+            <h1 className="mt-1 text-[23px] font-bold text-white">{getGreeting(USER_NAME)}</h1>
+            <p className="mt-1 text-sm text-white/80">Ready to cook?</p>
+          </div>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/80"
+          >
+            <IconSettings size={20} stroke={1.75} />
+          </Link>
+        </div>
+      </header>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        {TILES.map((tile) => {
-          const Icon = tile.icon;
-          return (
+      <div className="p-4">
+        <DashboardSearch />
+
+        <Link
+          href="/planner"
+          className="mt-3 flex items-center gap-3 rounded-2xl border-b-[3px] border-amber bg-card p-4 shadow-sm"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-tint text-2xl">
+            📅
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink">This week&apos;s dinners</p>
+            <p className="text-xs text-ink-soft">Plan the week, or see what&apos;s already planned</p>
+          </div>
+        </Link>
+
+        <div className="mt-4 grid grid-cols-3 gap-2.5">
+          {TILES.map((tile, i) => (
             <Link
               key={tile.mealType}
               href={`/recipes?mealType=${tile.mealType}`}
-              className={`flex flex-col items-start gap-3 rounded-2xl p-4 ${tile.className}`}
+              style={{ animationDelay: `${i * 60}ms` }}
+              className={`motion-safe:animate-fade-up flex flex-col items-center gap-1.5 rounded-2xl py-4 shadow-sm ${tile.tint}`}
             >
-              <Icon size={28} stroke={1.5} className="text-sage-darker" />
-              <span className="text-base font-semibold text-sage-darker">
-                {tile.label}
-              </span>
+              <span className="text-2xl">{tile.emoji}</span>
+              <span className={`text-xs font-semibold ${tile.text}`}>{tile.label}</span>
             </Link>
-          );
-        })}
-      </div>
+          ))}
+        </div>
 
-      <div className="mt-5">
-        <TodaySuggestionCard candidates={todayCandidates} />
-      </div>
-
-      {weeklyTagSummary.totalCooked > 0 && weeklyTagSummary.lightestTag && (
-        <div className="mt-3 rounded-2xl bg-card p-4 shadow-sm">
-          <p className="text-sm text-sage-darker">
-            {weeklyTagSummary.totalCooked} dinner
-            {weeklyTagSummary.totalCooked === 1 ? "" : "s"} cooked this week,{" "}
-            {weeklyTagSummary.tagCounts[weeklyTagSummary.lightestTag]} had{" "}
-            {NUTRITION_TAG_LABELS[weeklyTagSummary.lightestTag]}.
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold tracking-wide text-ink-soft uppercase">
+            Feeling something specific?
           </p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {MOOD_ORDER.map((mood) => (
+              <Link
+                key={mood}
+                href={`/recipes?mood=${mood}`}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm ${MOOD_CHIP_CLASS[mood]}`}
+              >
+                <span>{MOOD_EMOJI[mood]}</span>
+                {MOOD_LABELS[mood]}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <TodaySuggestionCard candidates={todayCandidates} />
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <Link
-            href={`/recipes?mealType=DINNER&tag=${weeklyTagSummary.lightestTag}`}
-            className="mt-1 inline-block text-xs text-sage-deep underline"
+            href="/what-can-i-make"
+            className="rounded-2xl border-b-[3px] border-lime bg-card p-4"
           >
-            See recipes with {NUTRITION_TAG_LABELS[weeklyTagSummary.lightestTag]}
+            <div className="text-2xl">👨‍🍳</div>
+            <div className="mt-1.5 text-2xl font-bold text-ink">
+              {readyCount}
+              <span className="text-sm font-normal text-ink-soft">/{dinnerRecipes.length}</span>
+            </div>
+            <div className="text-xs text-ink-soft">dinners ready right now</div>
+          </Link>
+          <Link
+            href="/shopping-list"
+            className="rounded-2xl border-b-[3px] border-amber bg-card p-4"
+          >
+            <div className="text-2xl">🛒</div>
+            <div className="mt-1.5 text-2xl font-bold text-ink">{shoppingCount}</div>
+            <div className="text-xs text-ink-soft">
+              item{shoppingCount === 1 ? "" : "s"} on your shopping list
+            </div>
           </Link>
         </div>
-      )}
 
-      <div className="mt-5 flex flex-col gap-2">
-        <Link
-          href="/what-can-i-make"
-          className="flex items-center justify-between rounded-lg border border-border-soft bg-card px-4 py-3"
-        >
-          <span className="flex items-center gap-2 text-sm text-sage-darker">
-            <IconChefHat size={18} stroke={1.75} className="text-sage-deep" />
-            {readyCount} of {dinnerRecipes.length} dinners ready right now
-          </span>
-          <span className="text-xs text-text-muted">View</span>
-        </Link>
-        <Link
-          href="/shopping-list"
-          className="flex items-center justify-between rounded-lg border border-border-soft bg-card px-4 py-3"
-        >
-          <span className="flex items-center gap-2 text-sm text-sage-darker">
-            <IconShoppingBag size={18} stroke={1.75} className="text-sage-deep" />
-            {shoppingCount} item{shoppingCount === 1 ? "" : "s"} on your shopping list
-          </span>
-          <span className="text-xs text-text-muted">View</span>
-        </Link>
+        {weeklyTagSummary.totalCooked > 0 && weeklyTagSummary.lightestTag && (
+          <div className="mt-3 rounded-2xl bg-lime-tint p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-lg">
+                🥗
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm text-green-deep">
+                  {weeklyTagSummary.totalCooked} dinner
+                  {weeklyTagSummary.totalCooked === 1 ? "" : "s"} cooked this week,{" "}
+                  {weeklyTagSummary.tagCounts[weeklyTagSummary.lightestTag]} had{" "}
+                  {NUTRITION_TAG_LABELS[weeklyTagSummary.lightestTag]}.
+                </p>
+                <Link
+                  href={`/recipes?mealType=DINNER&tag=${weeklyTagSummary.lightestTag}`}
+                  className="mt-1 inline-block text-xs font-medium text-green-deep underline"
+                >
+                  See recipes with {NUTRITION_TAG_LABELS[weeklyTagSummary.lightestTag]}
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
