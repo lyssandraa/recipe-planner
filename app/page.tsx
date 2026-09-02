@@ -29,21 +29,34 @@ const TILES = [
 ] as const;
 
 export default async function HomePage() {
-  const [dinnerRecipes, { wellStocked: wellStockedSet, lowOrOut: lowOrOutSet }, shoppingCount] =
-    await Promise.all([
-      prisma.recipe.findMany({
-        where: { mealType: "DINNER" },
-        include: { ingredients: { include: { ingredient: true } } },
-      }),
-      getPantryStockSets(),
-      prisma.shoppingListItem.count({ where: { checked: false } }),
-    ]);
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const lastCookedRows = await prisma.cookLog.groupBy({
-    by: ["recipeId"],
-    where: { recipeId: { in: dinnerRecipes.map((r) => r.id) } },
-    _max: { cookedAt: true },
-  });
+  // All five independent of each other (lastCookedRows isn't actually
+  // filtered to dinnerRecipes, just looked up by its ids afterwards, so it
+  // doesn't need to wait on that query), run in one round trip rather than
+  // several sequential ones, which matters a lot more now the database is
+  // a remote Turso connection instead of a local SQLite file.
+  const [
+    dinnerRecipes,
+    { wellStocked: wellStockedSet, lowOrOut: lowOrOutSet },
+    shoppingCount,
+    recentCookLogs,
+    lastCookedRows,
+  ] = await Promise.all([
+    prisma.recipe.findMany({
+      where: { mealType: "DINNER" },
+      include: { ingredients: { include: { ingredient: true } } },
+    }),
+    getPantryStockSets(),
+    prisma.shoppingListItem.count({ where: { checked: false } }),
+    prisma.cookLog.findMany({
+      where: { cookedAt: { gte: sevenDaysAgo }, recipe: { mealType: "DINNER" } },
+      include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
+    }),
+    prisma.cookLog.groupBy({ by: ["recipeId"], _max: { cookedAt: true } }),
+  ]);
+
   const lastCookedByRecipe = new Map(lastCookedRows.map((r) => [r.recipeId, r._max.cookedAt]));
 
   const dinnersWithReadiness = dinnerRecipes.map((recipe) => {
@@ -74,7 +87,6 @@ export default async function HomePage() {
 
   const readyCount = dinnersWithReadiness.filter((r) => r.missingCount === 0).length;
 
-  const now = new Date();
   const todayCandidates = dinnersWithReadiness
     .filter((r) => r.missingCount === 0)
     .filter((r) => isGoodTodaySuggestion(r, now))
@@ -88,11 +100,6 @@ export default async function HomePage() {
       colorClass: r.colorClass,
     }));
 
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const recentCookLogs = await prisma.cookLog.findMany({
-    where: { cookedAt: { gte: sevenDaysAgo }, recipe: { mealType: "DINNER" } },
-    include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
-  });
   const weeklyTagSummary = summarizeWeeklyTags(
     recentCookLogs.map((log) =>
       log.recipe.ingredients.map((ri) => ({
@@ -107,7 +114,7 @@ export default async function HomePage() {
 
   return (
     <div>
-      <header className="relative overflow-hidden bg-green-deep px-4 pt-6 pb-8">
+      <header className="relative overflow-hidden bg-green-deep px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-8">
         <span
           aria-hidden
           className="pointer-events-none absolute -top-10 -right-8 h-32 w-32 rounded-full bg-amber opacity-30"

@@ -29,11 +29,13 @@ export default function BarcodeScanner() {
         SCANNER_ELEMENT_ID,
         {
           fps: 10,
-          qrbox: { width: 260, height: 150 },
+          qrbox: { width: 280, height: 160 },
           // The native BarcodeDetector path (the library's default when the
           // browser supports it) is unreliable for 1D barcodes on many
           // phones, it works for QR but silently misses EAN/UPC codes, so
-          // force the library's own ZXing-based decoder instead.
+          // force the library's own ZXing-based decoder instead. Safari
+          // never had BarcodeDetector support in the first place, so this
+          // alone doesn't help iPhone, hence the videoConstraints below too.
           useBarCodeDetectorIfSupported: false,
           formatsToSupport: [
             Html5QrcodeSupportedFormats.EAN_13,
@@ -42,6 +44,17 @@ export default function BarcodeScanner() {
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.CODE_128,
           ],
+          // Explicit facingMode skips the library's camera-picker dropdown
+          // (deviceId-based) and goes straight to the back camera. Without
+          // an explicit resolution the browser can pick a low default,
+          // which starves the 1D decoder of the horizontal pixel detail an
+          // EAN/UPC barcode needs, ideal here is a request not a guarantee,
+          // the camera still falls back to whatever it actually supports.
+          videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         },
         false
       );

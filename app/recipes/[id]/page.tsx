@@ -58,19 +58,18 @@ export default async function RecipeDetailPage({
   }));
 
   const recipeIngredientIds = recipe.ingredients.map((ri) => ri.ingredientId);
-  const withSatisfiedBy = await prisma.ingredient.findMany({
-    where: { id: { in: recipeIngredientIds } },
-    select: { id: true, satisfiedBy: { select: { id: true, name: true } } },
-  });
+  // pantryRows isn't filtered to relevantIds (which needs withSatisfiedBy's
+  // result to compute) so this can run alongside it instead of after it,
+  // it's a single-user pantry so fetching the full table is cheap either
+  // way and this saves a full network round trip to Turso.
+  const [withSatisfiedBy, pantryRows] = await Promise.all([
+    prisma.ingredient.findMany({
+      where: { id: { in: recipeIngredientIds } },
+      select: { id: true, satisfiedBy: { select: { id: true, name: true } } },
+    }),
+    prisma.pantryItem.findMany({ select: { ingredientId: true } }),
+  ]);
   const satisfiedByMap = new Map(withSatisfiedBy.map((i) => [i.id, i.satisfiedBy]));
-
-  const relevantIds = new Set(recipeIngredientIds);
-  for (const i of withSatisfiedBy) for (const s of i.satisfiedBy) relevantIds.add(s.id);
-
-  const pantryRows = await prisma.pantryItem.findMany({
-    where: { ingredientId: { in: Array.from(relevantIds) } },
-    select: { ingredientId: true },
-  });
   const pantryIngredientIds = new Set(pantryRows.map((p) => p.ingredientId));
 
   const substitutions = computeSubstitutions(

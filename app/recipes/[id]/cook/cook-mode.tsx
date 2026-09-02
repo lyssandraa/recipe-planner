@@ -191,7 +191,7 @@ export default function CookMode({
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-cream">
       <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col">
-        <header className="flex items-center justify-between bg-green-deep px-4 py-4">
+        <header className="flex items-center justify-between bg-green-deep px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4">
           <button
             type="button"
             onClick={exitCookMode}

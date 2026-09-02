@@ -68,6 +68,12 @@ export default function PageHeader({
       className={`sticky top-0 z-20 overflow-hidden bg-green-deep px-4 transition-[padding] duration-200 ${
         collapsed ? "py-2.5" : "py-5"
       }`}
+      // Overrides the Tailwind py-* padding-top above: on notch/Dynamic
+      // Island phones the header sticks flush against the physical screen
+      // edge, so it needs its own safe-area padding on top of the normal
+      // amount rather than relying on a parent's padding (sticky elements
+      // ignore an ancestor's padding once actually stuck).
+      style={{ paddingTop: `calc(${collapsed ? "0.625rem" : "1.25rem"} + env(safe-area-inset-top))` }}
     >
       {accents.map((color, i) => (
         <span

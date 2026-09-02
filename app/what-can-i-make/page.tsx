@@ -10,7 +10,10 @@ import WhatCanIMakeList from "./list";
 export const dynamic = "force-dynamic";
 
 export default async function WhatCanIMakePage() {
-  const [recipes, { wellStocked: wellStockedSet, lowOrOut: lowOrOutSet, low: lowSet }] =
+  // lastCookedRows isn't actually filtered to these recipes, just looked
+  // up by id afterwards, so it can run alongside the rest instead of
+  // waiting on their ids first, one round trip instead of two.
+  const [recipes, { wellStocked: wellStockedSet, lowOrOut: lowOrOutSet, low: lowSet }, lastCookedRows] =
     await Promise.all([
       prisma.recipe.findMany({
         where: { mealType: "DINNER" },
@@ -18,13 +21,8 @@ export default async function WhatCanIMakePage() {
         orderBy: { title: "asc" },
       }),
       getPantryStockSets(),
+      prisma.cookLog.groupBy({ by: ["recipeId"], _max: { cookedAt: true } }),
     ]);
-
-  const lastCookedRows = await prisma.cookLog.groupBy({
-    by: ["recipeId"],
-    where: { recipeId: { in: recipes.map((r) => r.id) } },
-    _max: { cookedAt: true },
-  });
   const lastCookedByRecipe = new Map(
     lastCookedRows.map((r) => [r.recipeId, r._max.cookedAt])
   );
