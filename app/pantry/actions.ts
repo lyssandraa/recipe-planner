@@ -51,12 +51,33 @@ export async function createPantryIngredient(name: string, category?: Ingredient
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Ingredient name is required.");
 
+  // Appended past the current highest sortOrder so a newly added ingredient
+  // lands at the end of its category group, not the top.
+  const highest = await prisma.ingredient.aggregate({ _max: { sortOrder: true } });
+
   const ingredient = await prisma.ingredient.create({
-    data: { name: trimmed, category: category ?? guessCategory(trimmed) },
+    data: {
+      name: trimmed,
+      category: category ?? guessCategory(trimmed),
+      sortOrder: (highest._max.sortOrder ?? 0) + 1,
+    },
   });
 
   revalidatePath("/pantry");
   return ingredient;
+}
+
+// Persists a new manual order for a set of ingredients (a pantry category
+// group, or the staples list) as sequential integers, so the up/down
+// controls just send the reordered id list rather than computing swapped
+// values themselves.
+export async function reorderIngredients(orderedIds: string[]) {
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.ingredient.update({ where: { id }, data: { sortOrder: index } })
+    )
+  );
+  revalidatePath("/pantry");
 }
 
 export async function updateIngredientCategory(

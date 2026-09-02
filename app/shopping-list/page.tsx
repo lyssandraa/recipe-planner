@@ -31,21 +31,22 @@ export default async function ShoppingListPage() {
       <PageHeader
         title="Shopping list"
         icon={<IconShoppingBag size={24} stroke={1.75} />}
+        accents={["amber", "lime"]}
         extra={
           <div>
             <div className="flex items-center gap-6">
               <div>
-                <div className="text-[17px] font-semibold text-mint">{toBuyCount}</div>
+                <div className="text-[17px] font-semibold text-amber">{toBuyCount}</div>
                 <div className="text-[11px] text-white/70">to buy</div>
               </div>
               <div>
-                <div className="text-[17px] font-semibold text-sage-light">{inTrolleyCount}</div>
+                <div className="text-[17px] font-semibold text-lime">{inTrolleyCount}</div>
                 <div className="text-[11px] text-white/70">in the trolley</div>
               </div>
             </div>
             <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/20">
               <div
-                className="h-full rounded-full bg-mint transition-[width] duration-300"
+                className="h-full rounded-full bg-lime transition-[width] duration-300"
                 style={{ width: `${progressPct}%` }}
               />
             </div>

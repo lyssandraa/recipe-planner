@@ -8,12 +8,11 @@ import {
   IconChevronDown,
   IconClockExclamation,
   IconPlus,
-  IconShoppingBag,
 } from "@tabler/icons-react";
 import EmptyState from "@/app/components/empty-state";
 import { useToast } from "@/app/components/toast-provider";
-import { SHOPPING_CATEGORY_ORDER, CATEGORY_LABELS } from "@/lib/stockLevel";
-import { renderShoppingCategoryIcon } from "@/lib/shoppingCategoryIcons";
+import { SHOPPING_CATEGORY_ORDER, CATEGORY_LABELS, CATEGORY_BORDER_CLASS } from "@/lib/stockLevel";
+import { getShoppingCategoryEmoji } from "@/lib/shoppingCategoryIcons";
 import { useEscapeToClose } from "@/lib/useEscapeToClose";
 import {
   syncShoppingList,
@@ -21,6 +20,7 @@ import {
   toggleShoppingItemChecked,
   clearTickedItems,
   promoteLowStockItem,
+  reorderShoppingItems,
   type ShoppingListItemData,
   type MightNeedSoonItem,
 } from "./actions";
@@ -87,6 +87,35 @@ export default function ShoppingListBuilder({
     });
   }
 
+  // Moves an item one place within its category group, swapping it with
+  // its neighbour there. Only offered on to-buy rows, reordering something
+  // already ticked into the trolley isn't useful.
+  function moveItem(
+    item: ShoppingListItemData,
+    group: ShoppingListItemData[],
+    direction: "up" | "down"
+  ) {
+    const index = group.findIndex((i) => i.id === item.id);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= group.length) return;
+    const neighbour = group[targetIndex];
+
+    const reordered = [...group];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    const reorderedIds = reordered.map((i) => i.id);
+
+    setItems((prev) => {
+      const next = [...prev];
+      const iA = next.findIndex((i) => i.id === item.id);
+      const iB = next.findIndex((i) => i.id === neighbour.id);
+      [next[iA], next[iB]] = [next[iB], next[iA]];
+      return next;
+    });
+    startTransition(() => {
+      reorderShoppingItems(reorderedIds);
+    });
+  }
+
   function handleAddManual() {
     const name = manualName.trim();
     if (!name || isPending) return;
@@ -134,11 +163,11 @@ export default function ShoppingListBuilder({
     <div className="flex flex-col gap-3">
       {/* Add item */}
       <div
-        className="motion-safe:animate-fade-up-sm flex items-center gap-2 rounded-[14px] bg-card p-2 shadow-sm"
+        className="motion-safe:animate-fade-up-sm flex items-center gap-2 rounded-2xl bg-card p-2 shadow-sm"
         style={fadeStyle(addCardDelay)}
       >
         <input
-          className="min-w-0 flex-1 border-none bg-transparent px-2 py-2 text-sm text-sage-darker placeholder:text-text-muted focus:outline-none"
+          className="min-w-0 flex-1 border-none bg-transparent px-2 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none"
           placeholder="Add an item…"
           value={manualName}
           onChange={(e) => setManualName(e.target.value)}
@@ -147,7 +176,7 @@ export default function ShoppingListBuilder({
           }}
         />
         <input
-          className="w-16 shrink-0 rounded-md bg-page-bg px-2 py-2 text-center text-sm text-sage-darker placeholder:text-text-muted focus:outline-none"
+          className="w-16 shrink-0 rounded-[12px] bg-cream-grey px-2 py-2 text-center text-sm text-ink placeholder:text-ink-soft focus:outline-none"
           placeholder="Qty"
           value={manualQuantity}
           onChange={(e) => setManualQuantity(e.target.value)}
@@ -160,7 +189,7 @@ export default function ShoppingListBuilder({
           disabled={!manualName.trim() || isPending}
           onClick={handleAddManual}
           aria-label="Add item"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-sage-deep text-white disabled:opacity-50"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-amber text-amber-text disabled:opacity-50"
         >
           <IconPlus size={18} stroke={2} />
         </button>
@@ -168,8 +197,9 @@ export default function ShoppingListBuilder({
 
       {items.length === 0 ? (
         <EmptyState
-          icon={<IconShoppingBag size={40} stroke={1.5} />}
-          message="Nothing on your list yet. Items appear here when you mark something as out in the pantry, or pick a recipe below."
+          emoji="🛒"
+          message="Nothing on your list yet."
+          hint="Items appear here when you mark something as out in the pantry, or pick a recipe below."
         />
       ) : (
         groups.map((group) => {
@@ -177,20 +207,18 @@ export default function ShoppingListBuilder({
           return (
             <div
               key={group.category}
-              className="motion-safe:animate-fade-up-sm rounded-[14px] bg-card p-4 shadow-sm"
               style={fadeStyle(index)}
+              className={`motion-safe:animate-fade-up-sm rounded-2xl border-b-[3px] bg-card p-4 shadow-sm ${CATEGORY_BORDER_CLASS[group.category]}`}
             >
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-peridot">
-                  {renderShoppingCategoryIcon(group.category, { size: 16, stroke: 1.75 })}
-                </span>
-                <h2 className="text-xs font-semibold tracking-wide text-sage-deep uppercase">
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="text-sm">{getShoppingCategoryEmoji(group.category)}</span>
+                <h2 className="text-[11px] font-bold tracking-wide text-green-deep uppercase">
                   {CATEGORY_LABELS[group.category]}
                 </h2>
-                <span className="ml-auto text-xs text-text-muted">{group.items.length}</span>
+                <span className="ml-auto text-xs text-ink-soft">{group.items.length}</span>
               </div>
               <ul className="flex flex-col divide-y divide-border-soft">
-                {group.items.map((item) => (
+                {group.items.map((item, i) => (
                   <ShoppingListRow
                     key={item.id}
                     item={item}
@@ -202,6 +230,10 @@ export default function ShoppingListBuilder({
                         )
                       )
                     }
+                    canMoveUp={i > 0}
+                    canMoveDown={i < group.items.length - 1}
+                    onMoveUp={() => moveItem(item, group.items, "up")}
+                    onMoveDown={() => moveItem(item, group.items, "down")}
                   />
                 ))}
               </ul>
@@ -212,21 +244,21 @@ export default function ShoppingListBuilder({
 
       {mightNeedSoon.length > 0 && (
         <div
-          className="motion-safe:animate-fade-up-sm rounded-[14px] bg-border-soft p-4"
+          className="motion-safe:animate-fade-up-sm rounded-2xl bg-cream-grey p-4 shadow-sm"
           style={fadeStyle(cardIndex++)}
         >
           <div className="mb-2 flex items-center gap-2">
-            <IconClockExclamation size={16} stroke={1.75} className="text-text-muted" />
-            <h2 className="text-sm font-semibold text-text-muted">Might need soon</h2>
+            <IconClockExclamation size={16} stroke={1.75} className="text-cream-grey-text" />
+            <h2 className="text-sm font-semibold text-cream-grey-text">Might need soon</h2>
           </div>
           <ul className="flex flex-col divide-y divide-border-soft">
             {mightNeedSoon.map((item) => (
               <li key={item.ingredientId} className="flex items-center gap-3 py-2">
-                <span className="flex-1 text-sm text-text-muted">{item.name}</span>
+                <span className="flex-1 text-sm text-cream-grey-text">{item.name}</span>
                 <button
                   type="button"
                   onClick={() => handlePromote(item)}
-                  className="flex shrink-0 items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-sage-deep shadow-sm"
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-green-deep shadow-sm"
                 >
                   <IconPlus size={12} stroke={2} />
                   Add
@@ -238,7 +270,7 @@ export default function ShoppingListBuilder({
       )}
 
       <div
-        className="motion-safe:animate-fade-up-sm rounded-[14px] bg-card shadow-sm"
+        className="motion-safe:animate-fade-up-sm rounded-2xl bg-card shadow-sm"
         style={fadeStyle(cardIndex++)}
       >
         <button
@@ -246,16 +278,16 @@ export default function ShoppingListBuilder({
           onClick={() => setRecipesOpen((o) => !o)}
           className="flex w-full items-center gap-2 p-4"
         >
-          <IconBook2 size={18} stroke={1.75} className="text-peridot" />
-          <span className="text-sm font-semibold text-sage-darker">Add from a recipe</span>
-          {isPending && <span className="text-xs text-text-muted">Updating…</span>}
+          <IconBook2 size={18} stroke={1.75} className="text-lime" />
+          <span className="text-sm font-semibold text-ink">Add from a recipe</span>
+          {isPending && <span className="text-xs text-ink-soft">Updating…</span>}
           {!isPending && selected.size > 0 && (
-            <span className="text-xs text-text-muted">{selected.size} selected</span>
+            <span className="text-xs text-ink-soft">{selected.size} selected</span>
           )}
           <IconChevronDown
             size={16}
             stroke={2}
-            className={`ml-auto shrink-0 text-text-muted transition-transform ${
+            className={`ml-auto shrink-0 text-ink-soft transition-transform ${
               recipesOpen ? "rotate-180" : ""
             }`}
           />
@@ -271,13 +303,13 @@ export default function ShoppingListBuilder({
                     checked={selected.has(recipe.id)}
                     onChange={() => toggleRecipe(recipe.id)}
                   />
-                  <span className="text-sage-darker">{recipe.title}</span>
-                  <span className="ml-auto text-xs text-text-muted">{recipe.mealType}</span>
+                  <span className="text-ink">{recipe.title}</span>
+                  <span className="ml-auto text-xs text-ink-soft">{recipe.mealType}</span>
                 </label>
               </li>
             ))}
             {recipes.length === 0 && (
-              <li className="px-4 py-4 text-sm text-text-muted">No recipes yet.</li>
+              <li className="px-4 py-4 text-sm text-ink-soft">No recipes yet.</li>
             )}
           </ul>
         )}
@@ -285,13 +317,13 @@ export default function ShoppingListBuilder({
 
       {tickedItems.length > 0 && (
         <div className="motion-safe:animate-fade-up-sm" style={fadeStyle(cardIndex++)}>
-          <div className="rounded-[14px] bg-card p-4 opacity-[0.72] shadow-sm">
+          <div className="rounded-2xl bg-card p-4 opacity-[0.7] shadow-sm">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-sage-darker">In the trolley</h2>
+              <h2 className="text-sm font-semibold text-ink">In the trolley</h2>
               <button
                 type="button"
                 onClick={handleClearTicked}
-                className="text-xs text-text-muted underline"
+                className="text-xs text-ink-soft underline"
               >
                 Clear ({tickedItems.length})
               </button>
@@ -303,11 +335,11 @@ export default function ShoppingListBuilder({
                     type="button"
                     onClick={() => toggleChecked(item)}
                     aria-label="Mark not bought"
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border-[1.5px] border-sage-deep bg-sage-deep"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border-[1.5px] border-green-deep bg-green-deep"
                   >
                     <IconCheck size={13} stroke={3} className="text-white" />
                   </button>
-                  <span className="flex-1 text-sm text-text-muted line-through">
+                  <span className="flex-1 text-sm text-ink-soft line-through">
                     {item.name}
                   </span>
                 </li>
