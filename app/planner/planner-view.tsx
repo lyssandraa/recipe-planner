@@ -16,6 +16,7 @@ import {
   IconRefresh,
   IconShoppingBag,
   IconSwitchHorizontal,
+  IconTrash,
   IconX,
 } from "@tabler/icons-react";
 import {
@@ -108,6 +109,14 @@ export default function PlannerView({
     });
   }
 
+  function handleClear(slotId: string) {
+    startTransition(async () => {
+      await setSlotRecipe(slotId, null);
+      toast("Cleared");
+      router.refresh();
+    });
+  }
+
   function handleCooked(slotId: string) {
     startTransition(async () => {
       await markSlotCooked(slotId);
@@ -196,6 +205,7 @@ export default function PlannerView({
             onTogglePin={() => handleTogglePin(slot.id, !slot.pinned)}
             onSwap={(recipeId) => handleSwap(slot.id, recipeId)}
             onCooked={() => handleCooked(slot.id)}
+            onClear={() => handleClear(slot.id)}
           />
         ))}
       </div>
@@ -224,6 +234,7 @@ function PlannerSlotCard({
   onTogglePin,
   onSwap,
   onCooked,
+  onClear,
 }: {
   slot: PlannerSlotData;
   dinnerOptions: { id: string; title: string }[];
@@ -235,6 +246,7 @@ function PlannerSlotCard({
   onTogglePin: () => void;
   onSwap: (recipeId: string) => void;
   onCooked: () => void;
+  onClear: () => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border-b-[3px] border-lime bg-card shadow-sm">
@@ -267,6 +279,15 @@ function PlannerSlotCard({
             className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-soft"
           >
             <IconSwitchHorizontal size={16} stroke={1.75} />
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={isPending}
+            aria-label="Remove"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-soft"
+          >
+            <IconTrash size={16} stroke={1.75} />
           </button>
         </div>
       ) : slot.recipeId ? (
@@ -324,6 +345,15 @@ function PlannerSlotCard({
               className="flex h-8 w-8 items-center justify-center rounded-full text-ink-soft"
             >
               <IconSwitchHorizontal size={16} stroke={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={isPending || !!slot.cookedAt}
+              aria-label="Remove"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-ink-soft disabled:opacity-30"
+            >
+              <IconTrash size={16} stroke={1.75} />
             </button>
             <button
               type="button"

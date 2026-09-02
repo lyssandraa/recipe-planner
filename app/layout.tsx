@@ -30,12 +30,15 @@ export const viewport: Viewport = {
   themeColor: "#2F5E3A",
   width: "device-width",
   initialScale: 1,
+  // Needed for `env(safe-area-inset-bottom)` to report the actual home
+  // indicator height on iOS instead of 0, used by the bottom nav.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-cream pb-16">
+      <body className="min-h-screen bg-cream pb-[calc(4rem+env(safe-area-inset-bottom))]">
         {/* Constrained to a phone-width column, centred, with the page
             background filling the rest of the viewport. Reads as a phone
             app deliberately rather than a stretched desktop layout. */}
