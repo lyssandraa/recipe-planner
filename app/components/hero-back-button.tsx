@@ -16,7 +16,7 @@ export default function HeroBackButton({ fallbackHref }: { fallbackHref: string 
       type="button"
       onClick={goBack}
       aria-label="Back"
-      className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-sage-darker shadow-sm"
+      className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm"
     >
       <IconArrowLeft size={17} stroke={2} />
     </button>

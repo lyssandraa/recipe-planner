@@ -61,17 +61,29 @@ export function getHandsOnLine(recipe: {
   return totalPart ?? activePart ?? null;
 }
 
-// Tailwind classes for the effort pill. Low is a solid sage-deep pill (white
-// text); Medium is a light peridot-tint pill (needs the dark olive text,
-// peridot-family colours never carry text directly); High is a warmer clay
-// tone that stands out from the cool sage/peridot/mint palette.
+// Tailwind classes for the effort pill: tint background + matching deep
+// text, same state-colour convention used everywhere (lime for low
+// effort, amber for medium, terracotta for high).
 export function getEffortPillClasses(effort: EffortLabel): string {
   switch (effort) {
     case "Low":
-      return "bg-sage-deep text-white";
+      return "bg-lime-tint text-green-deep";
     case "Medium":
-      return "bg-peridot-tint text-olive-text";
+      return "bg-amber-tint text-amber-text";
     case "High":
-      return "bg-clay text-white";
+      return "bg-terracotta-tint text-terracotta-text";
+  }
+}
+
+// Plain text colour for the effort value where it isn't sitting on its own
+// tinted pill, e.g. the recipe stats strip on a white background.
+export function getEffortTextClass(effort: EffortLabel): string {
+  switch (effort) {
+    case "Low":
+      return "text-green-deep";
+    case "Medium":
+      return "text-amber-text";
+    case "High":
+      return "text-terracotta-text";
   }
 }

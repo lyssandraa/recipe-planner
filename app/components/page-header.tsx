@@ -5,6 +5,23 @@ import Link from "next/link";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { useBackOrFallback } from "@/lib/useBackOrFallback";
 
+type AccentColor = "amber" | "terracotta" | "lime";
+
+const ACCENT_BG: Record<AccentColor, string> = {
+  amber: "bg-amber",
+  terracotta: "bg-terracotta",
+  lime: "bg-lime",
+};
+
+// Three fixed decorative-circle slots, clipped by the header's own
+// overflow-hidden. Screens vary which two or three colours they pass so
+// headers don't all look identical.
+const SLOT_CLASS = [
+  "absolute -top-8 -right-6 h-28 w-28 opacity-30",
+  "absolute -bottom-8 -right-2 h-20 w-20 opacity-25",
+  "absolute -top-6 -left-10 h-24 w-24 opacity-[0.22]",
+];
+
 export default function PageHeader({
   title,
   subtitle,
@@ -12,6 +29,7 @@ export default function PageHeader({
   icon,
   extra,
   backFallbackHref,
+  accents = ["amber", "lime"],
 }: {
   title: string;
   subtitle?: string;
@@ -20,9 +38,10 @@ export default function PageHeader({
   // not a component reference. Component types can't cross the server or
   // client boundary as props, but an already-rendered element can.
   icon: ReactNode;
-  // Extra content under the title/subtitle row, still inside the sage-deep
-  // block (e.g. the shopping list's counts and progress bar). Collapses
-  // away on scroll the same way the subtitle does.
+  // Extra content under the title/subtitle row, still inside the
+  // green-deep block (e.g. the shopping list's counts and progress bar,
+  // or a row of stat numbers). Collapses away on scroll the same way the
+  // subtitle does.
   extra?: ReactNode;
   // Shows a back button when set. Only pass this on screens that aren't
   // one of the six bottom-nav destinations, those don't need a way back,
@@ -30,6 +49,8 @@ export default function PageHeader({
   // when there's no history to actually go back to (a direct link, a
   // fresh tab), so the button is never a dead end.
   backFallbackHref?: string;
+  // Which 2-3 decorative circle colours this screen uses, in slot order.
+  accents?: AccentColor[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const goBack = useBackOrFallback(backFallbackHref ?? "/");
@@ -44,18 +65,17 @@ export default function PageHeader({
 
   return (
     <header
-      className={`sticky top-0 z-20 overflow-hidden bg-sage-deep px-4 transition-[padding] duration-200 ${
+      className={`sticky top-0 z-20 overflow-hidden bg-green-deep px-4 transition-[padding] duration-200 ${
         collapsed ? "py-2.5" : "py-5"
       }`}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -top-8 -right-6 h-28 w-28 rounded-full bg-peridot opacity-35"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -bottom-8 -right-2 h-20 w-20 rounded-full bg-mint opacity-25"
-      />
+      {accents.map((color, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className={`pointer-events-none ${SLOT_CLASS[i]} rounded-full ${ACCENT_BG[color]}`}
+        />
+      ))}
 
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -71,15 +91,15 @@ export default function PageHeader({
           )}
           <div className="min-w-0">
             <h1
-              className={`truncate font-semibold text-white transition-[font-size] duration-200 ${
-                collapsed ? "text-base" : "text-xl"
+              className={`truncate font-bold text-white transition-[font-size] duration-200 ${
+                collapsed ? "text-base" : "text-[18px]"
               }`}
             >
               <Link href="/">{title}</Link>
             </h1>
             {subtitle && (
               <p
-                className={`truncate text-xs text-sage-light transition-all duration-200 ${
+                className={`truncate text-xs text-white/75 transition-all duration-200 ${
                   collapsed ? "mt-0 max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
                 }`}
               >
@@ -100,7 +120,7 @@ export default function PageHeader({
           {action && (
             <Link
               href={action.href}
-              className="rounded-full bg-mint px-3 py-1.5 text-xs font-medium whitespace-nowrap text-olive-text"
+              className="rounded-full bg-amber px-3 py-1.5 text-xs font-medium whitespace-nowrap text-amber-text"
             >
               {action.label}
             </Link>

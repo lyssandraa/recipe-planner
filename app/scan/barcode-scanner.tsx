@@ -86,13 +86,13 @@ export default function BarcodeScanner() {
               type="button"
               onClick={closeCamera}
               aria-label="Close camera"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-border-soft text-sage-darker"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-cream-grey text-ink"
             >
               <IconX size={18} stroke={2} />
             </button>
           </div>
           <div id={SCANNER_ELEMENT_ID} className="overflow-hidden rounded-lg" />
-          {cameraError && <p className="text-sm text-clay">{cameraError}</p>}
+          {cameraError && <p className="text-sm text-terracotta-text">{cameraError}</p>}
         </>
       ) : (
         <button
@@ -101,7 +101,7 @@ export default function BarcodeScanner() {
             setCameraError(null);
             setCameraOpen(true);
           }}
-          className="flex w-full flex-col items-center gap-2 rounded-2xl bg-sage-deep py-8 text-white"
+          className="flex w-full flex-col items-center gap-2 rounded-2xl bg-green-deep py-8 text-white"
         >
           <IconCamera size={32} stroke={1.5} />
           <span className="text-sm font-medium">Open camera</span>
@@ -109,12 +109,12 @@ export default function BarcodeScanner() {
       )}
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-text-muted">
+        <label className="text-sm font-medium text-ink-soft">
           Or enter the barcode
         </label>
         <div className="flex gap-2">
           <input
-            className="flex-1 rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="flex-1 rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             inputMode="numeric"
             value={manualBarcode}
             onChange={(e) => setManualBarcode(e.target.value)}
@@ -124,7 +124,7 @@ export default function BarcodeScanner() {
             type="button"
             disabled={isPending || !manualBarcode.trim()}
             onClick={() => handleBarcode(manualBarcode)}
-            className="shrink-0 rounded-md border border-sage-deep px-4 py-2 text-sm font-medium text-sage-deep disabled:opacity-50"
+            className="shrink-0 rounded-[12px] border-2 border-green-deep px-4 py-2 text-sm font-medium text-green-deep disabled:opacity-50"
           >
             {isPending ? "Looking up…" : "Look up"}
           </button>

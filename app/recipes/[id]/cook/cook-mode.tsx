@@ -119,14 +119,14 @@ function StepTimer({ seconds }: { seconds: number }) {
 
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl bg-card p-5 shadow-sm">
-      <span className="text-4xl font-semibold text-sage-darker">
+      <span className="text-4xl font-semibold text-ink">
         {formatCountdown(remaining)}
       </span>
       <button
         type="button"
         onClick={start}
         disabled={running}
-        className="flex items-center gap-2 rounded-full bg-sage-deep px-5 py-3 text-base font-medium text-white disabled:opacity-50"
+        className="flex items-center gap-2 rounded-full bg-green-deep px-5 py-3 text-base font-medium text-white disabled:opacity-50"
       >
         <IconPlayerPlay size={18} stroke={2} />
         {running ? "Running…" : "Start timer"}
@@ -189,9 +189,9 @@ export default function CookMode({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-page-bg">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-cream">
       <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col">
-        <header className="flex items-center justify-between bg-sage-deep px-4 py-4">
+        <header className="flex items-center justify-between bg-green-deep px-4 py-4">
           <button
             type="button"
             onClick={exitCookMode}
@@ -205,7 +205,7 @@ export default function CookMode({
         </header>
 
         {!wakeLockSupported && (
-          <p className="bg-peridot-tint px-4 py-1.5 text-center text-xs text-olive-text">
+          <p className="bg-amber-tint px-4 py-1.5 text-center text-xs text-amber-text">
             Screen wake lock isn&apos;t supported on this device, it may turn off while you cook.
           </p>
         )}
@@ -213,18 +213,18 @@ export default function CookMode({
         <div className="px-4 pt-3">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-border-soft">
             <div
-              className="h-full rounded-full bg-sage-deep transition-all"
+              className="h-full rounded-full bg-green-deep transition-all"
               style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
             />
           </div>
-          <p className="mt-1.5 text-xs text-text-muted">
+          <p className="mt-1.5 text-xs text-ink-soft">
             Step {stepIndex + 1} of {steps.length}
             {canScale && ` · serving ${servings}`}
           </p>
         </div>
 
         <div className="flex flex-1 flex-col justify-center gap-6 px-5 py-6">
-          <p className="text-2xl leading-snug font-semibold text-sage-darker">{step.text}</p>
+          <p className="text-2xl leading-snug font-semibold text-ink">{step.text}</p>
 
           {stepIngredients.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -235,7 +235,7 @@ export default function CookMode({
                 return (
                   <span
                     key={si.id}
-                    className="rounded-full bg-card px-3 py-2 text-base text-sage-darker shadow-sm"
+                    className="rounded-full bg-card px-3 py-2 text-base text-ink shadow-sm"
                   >
                     {formatQuantityUnit(scaledQty, si.unit)} {si.ingredient.name}
                   </span>
@@ -253,8 +253,8 @@ export default function CookMode({
             onClick={toggleDone}
             className={`flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-medium ${
               doneSteps.has(stepIndex)
-                ? "bg-sage-deep text-white"
-                : "border-2 border-border-soft text-text-muted"
+                ? "bg-green-deep text-white"
+                : "border-2 border-border-soft text-ink-soft"
             }`}
           >
             <IconCheck size={22} stroke={2.5} />
@@ -267,7 +267,7 @@ export default function CookMode({
             type="button"
             disabled={stepIndex === 0}
             onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-            className="flex flex-1 items-center justify-center gap-1 rounded-2xl bg-card py-4 text-base font-medium text-sage-darker shadow-sm disabled:opacity-40"
+            className="flex flex-1 items-center justify-center gap-1 rounded-2xl bg-card py-4 text-base font-medium text-ink shadow-sm disabled:opacity-40"
           >
             <IconChevronLeft size={20} stroke={2} />
             Back
@@ -276,7 +276,7 @@ export default function CookMode({
             type="button"
             disabled={stepIndex === steps.length - 1}
             onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
-            className="flex flex-1 items-center justify-center gap-1 rounded-2xl bg-sage-deep py-4 text-base font-medium text-white disabled:opacity-40"
+            className="flex flex-1 items-center justify-center gap-1 rounded-2xl bg-green-deep py-4 text-base font-medium text-white disabled:opacity-40"
           >
             Next
             <IconChevronRight size={20} stroke={2} />

@@ -51,20 +51,20 @@ export default function AddToPantryButton({
 
   if (offeringCreate) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-border-soft bg-card p-3">
-        <p className="text-sm text-sage-darker">
+      <div className="flex flex-col gap-2 rounded-2xl bg-card p-3 shadow-sm">
+        <p className="text-sm text-ink">
           Nothing in your ingredient catalog matches this product&apos;s name.
           Create one to add it to your pantry.
         </p>
         <input
-          className="rounded-md border border-border-soft px-2 py-1.5 text-sm"
+          className="rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <label className="flex items-center gap-2 text-xs text-text-muted">
+        <label className="flex items-center gap-2 text-xs text-ink-soft">
           Category
           <select
-            className="flex-1 rounded border border-border-soft px-1.5 py-1 text-xs text-sage-darker"
+            className="flex-1 rounded border border-border-soft px-1.5 py-1 text-xs text-ink"
             value={category}
             onChange={(e) => setCategory(e.target.value as IngredientCategory)}
           >
@@ -80,14 +80,14 @@ export default function AddToPantryButton({
             type="button"
             disabled={isPending || !name.trim()}
             onClick={handleCreate}
-            className="w-full rounded-md bg-sage-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="w-full rounded-[12px] bg-green-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {isPending ? "Adding…" : "Create and add to pantry"}
           </button>
           <button
             type="button"
             onClick={() => setOfferingCreate(false)}
-            className="shrink-0 text-xs text-text-muted"
+            className="shrink-0 text-xs text-ink-soft"
           >
             Cancel
           </button>
@@ -102,11 +102,11 @@ export default function AddToPantryButton({
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="w-full rounded-md bg-sage-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        className="w-full rounded-[12px] bg-green-deep px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
       >
         {isPending ? "Adding…" : "Add to pantry"}
       </button>
-      {message && <p className="mt-2 text-sm text-text-muted">{message}</p>}
+      {message && <p className="mt-2 text-sm text-ink-soft">{message}</p>}
     </div>
   );
 }

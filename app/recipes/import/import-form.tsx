@@ -78,28 +78,28 @@ export default function ImportForm({
         <button
           type="button"
           onClick={goBack}
-          className="flex items-center gap-1.5 self-start text-sm text-text-muted"
+          className="flex items-center gap-1.5 self-start text-sm text-ink-soft"
         >
           <IconArrowLeft size={15} stroke={2} />
           Back
         </button>
         <label className="text-sm font-medium">Recipe URL</label>
         <input
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           placeholder="https://example.com/some-recipe"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
-        {fetchError && <p className="text-sm text-clay">{fetchError}</p>}
+        {fetchError && <p className="text-sm text-terracotta-text">{fetchError}</p>}
         <button
           type="button"
           disabled={isFetching || !url.trim()}
           onClick={handleFetch}
-          className="rounded-md bg-sage-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {isFetching ? "Fetching…" : "Fetch recipe"}
         </button>
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-ink-soft">
           Nothing is saved until you review and confirm on the next screen.
         </p>
       </div>
@@ -253,18 +253,18 @@ function ReviewStep({
           type="button"
           onClick={handleLeave}
           aria-label="Back"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-muted"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-soft"
         >
           <IconArrowLeft size={17} stroke={2} />
         </button>
-        <p className="flex-1 text-sm text-text-muted">Review before saving.</p>
+        <p className="flex-1 text-sm text-ink-soft">Review before saving.</p>
         <button
           type="button"
           onClick={() => {
             if (dirty && !confirm("Discard unsaved changes?")) return;
             onStartOver();
           }}
-          className="shrink-0 text-sm text-sage-deep"
+          className="shrink-0 text-sm text-green-deep"
         >
           Start over
         </button>
@@ -282,7 +282,7 @@ function ReviewStep({
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Title</label>
         <input
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -291,7 +291,7 @@ function ReviewStep({
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Description</label>
         <textarea
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -302,7 +302,7 @@ function ReviewStep({
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium">Meal type</label>
           <select
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={mealType}
             onChange={(e) => setMealType(e.target.value as MealType)}
           >
@@ -318,7 +318,7 @@ function ReviewStep({
           <input
             type="number"
             min={0}
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={servings}
             onChange={(e) => setServings(e.target.value)}
           />
@@ -331,7 +331,7 @@ function ReviewStep({
           <input
             type="number"
             min={0}
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={totalTimeMins}
             onChange={(e) => setTotalTimeMins(e.target.value)}
           />
@@ -341,7 +341,7 @@ function ReviewStep({
           <input
             type="number"
             min={0}
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={activeTimeMins}
             onChange={(e) => setActiveTimeMins(e.target.value)}
           />
@@ -349,16 +349,16 @@ function ReviewStep({
       </div>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-sage-deep">Ingredients</h2>
+        <h2 className="mb-2 text-sm font-semibold text-green-deep">Ingredients</h2>
         <div className="flex flex-col gap-3">
           {ingredientRows.map((row) => (
             <div
               key={row.key}
               className={`rounded-lg border bg-card p-3 ${
-                row.matchedIngredientId ? "border-border-soft" : "border-clay"
+                row.matchedIngredientId ? "border-border-soft" : "border-terracotta"
               }`}
             >
-              <p className="mb-2 text-xs text-text-muted">&quot;{row.raw}&quot;</p>
+              <p className="mb-2 text-xs text-ink-soft">&quot;{row.raw}&quot;</p>
               <div className="flex items-start gap-2">
                 <div className="flex-1">
                   <IngredientCombobox
@@ -377,7 +377,7 @@ function ReviewStep({
                     onCreated={(option) => onOptionsChange([...options, option])}
                   />
                   {!row.matchedIngredientId && (
-                    <p className="mt-1 text-xs text-clay">
+                    <p className="mt-1 text-xs text-terracotta-text">
                       Not matched yet, pick or create one above.
                     </p>
                   )}
@@ -397,7 +397,7 @@ function ReviewStep({
                   step="any"
                   min={0}
                   placeholder="Quantity"
-                  className="rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                  className="rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                   value={row.quantity ?? ""}
                   onChange={(e) =>
                     updateIngredientRow(row.key, {
@@ -406,7 +406,7 @@ function ReviewStep({
                   }
                 />
                 <select
-                  className="rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                  className="rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                   value={row.unit ?? ""}
                   onChange={(e) =>
                     updateIngredientRow(row.key, {
@@ -425,7 +425,7 @@ function ReviewStep({
 
               <input
                 placeholder="Note"
-                className="mt-2 w-full rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                className="mt-2 w-full rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                 value={row.note ?? ""}
                 onChange={(e) =>
                   updateIngredientRow(row.key, { note: e.target.value || null })
@@ -437,14 +437,14 @@ function ReviewStep({
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-sage-deep">Steps</h2>
+        <h2 className="mb-2 text-sm font-semibold text-green-deep">Steps</h2>
         <div className="flex flex-col gap-3">
           {stepRows.map((row, i) => (
             <div key={row.key} className="rounded-lg border border-border-soft bg-card p-3">
               <div className="flex items-start gap-2">
-                <span className="mt-2 text-xs font-medium text-text-muted">{i + 1}.</span>
+                <span className="mt-2 text-xs font-medium text-ink-soft">{i + 1}.</span>
                 <textarea
-                  className="flex-1 rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                  className="flex-1 rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                   rows={2}
                   value={row.text}
                   onChange={(e) => updateStepRow(row.key, e.target.value)}
@@ -462,13 +462,13 @@ function ReviewStep({
         </div>
       </section>
 
-      {error && <p className="text-sm text-clay">{error}</p>}
+      {error && <p className="text-sm text-terracotta-text">{error}</p>}
 
       <button
         type="button"
         disabled={isPending}
         onClick={handleSave}
-        className="rounded-md bg-sage-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        className="rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
       >
         {isPending ? "Saving…" : "Save recipe"}
       </button>

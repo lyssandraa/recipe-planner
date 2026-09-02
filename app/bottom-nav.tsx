@@ -24,7 +24,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-1/2 z-10 w-full max-w-[420px] -translate-x-1/2 border-t border-border-soft bg-card">
+    <nav className="fixed bottom-0 left-1/2 z-10 w-full max-w-[420px] -translate-x-1/2 border-t-[3px] border-green-deep bg-card">
       <div className="flex">
         {links.map((link) => {
           const active =
@@ -35,7 +35,7 @@ export default function BottomNav() {
               key={link.href}
               href={link.href}
               className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 ${
-                active ? "text-sage-deep" : "text-nav-inactive"
+                active ? "text-green-deep" : "text-nav-inactive"
               }`}
             >
               <Icon size={22} stroke={active ? 2 : 1.75} />

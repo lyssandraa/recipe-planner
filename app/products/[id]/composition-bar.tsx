@@ -2,12 +2,12 @@ import { IconInfoCircle } from "@tabler/icons-react";
 import { formatPercentage } from "@/lib/productIngredients";
 
 const SEGMENT_COLORS = [
-  "bg-sage-deep",
-  "bg-peridot",
-  "bg-mint",
-  "bg-sage-light",
-  "bg-peridot-tint",
-  "bg-clay",
+  "bg-green-deep",
+  "bg-amber",
+  "bg-terracotta",
+  "bg-lime",
+  "bg-pink-tint",
+  "bg-teal-tint",
 ];
 
 export type CompositionIngredient = {
@@ -29,9 +29,9 @@ export default function CompositionBar({
 
   if (withPercentage.length === 0) {
     return (
-      <div className="flex items-start gap-2 rounded-lg bg-peridot-tint p-3">
-        <IconInfoCircle size={18} stroke={1.75} className="mt-0.5 shrink-0 text-olive-text" />
-        <p className="text-sm text-olive-text">
+      <div className="flex items-start gap-2 rounded-lg bg-cream-grey p-3">
+        <IconInfoCircle size={18} stroke={1.75} className="mt-0.5 shrink-0 text-cream-grey-text" />
+        <p className="text-sm text-cream-grey-text">
           This label doesn&apos;t declare percentages. Ingredients are listed in
           descending order by weight, so the first few make up most of the product.
         </p>
@@ -55,7 +55,7 @@ export default function CompositionBar({
       </div>
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
         {withPercentage.map((ing, i) => (
-          <li key={ing.name + i} className="flex items-center gap-1.5 text-xs text-sage-darker">
+          <li key={ing.name + i} className="flex items-center gap-1.5 text-xs text-ink">
             <span
               className={`h-2.5 w-2.5 shrink-0 rounded-full ${SEGMENT_COLORS[i % SEGMENT_COLORS.length]}`}
             />

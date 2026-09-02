@@ -1,19 +1,19 @@
-import type { ReactNode } from "react";
-
-// A large muted icon and a friendly line, used wherever a list or section
-// would otherwise just be blank. `icon` is a rendered node (not a
-// component reference), matching the pattern used for PageHeader's icon.
+// A large emoji, a friendly line, and a hint about how to fill the list,
+// used wherever a list or section would otherwise just be blank.
 export default function EmptyState({
-  icon,
+  emoji,
   message,
+  hint,
 }: {
-  icon: ReactNode;
+  emoji: string;
   message: string;
+  hint?: string;
 }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-2xl bg-card py-10 text-center">
-      <span className="text-nav-inactive">{icon}</span>
-      <p className="max-w-[220px] text-sm text-text-muted">{message}</p>
+      <span className="text-4xl">{emoji}</span>
+      <p className="max-w-[240px] text-sm font-medium text-ink">{message}</p>
+      {hint && <p className="max-w-[220px] text-xs text-ink-soft">{hint}</p>}
     </div>
   );
 }

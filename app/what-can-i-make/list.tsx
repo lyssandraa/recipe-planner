@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { IconClock, IconSoupOff } from "@tabler/icons-react";
+import { IconClock } from "@tabler/icons-react";
 import { getEffortPillClasses, type EffortLabel } from "@/lib/effort";
 import EmptyState from "@/app/components/empty-state";
 
@@ -67,10 +67,8 @@ export default function WhatCanIMakeList({ cards }: { cards: Card[] }) {
               type="button"
               onClick={() => setEffortFilter(option)}
               style={{ animationDelay: `${i * 40}ms` }}
-              className={`motion-safe:animate-pop-in shrink-0 rounded-full border px-3 py-1 text-xs font-medium ${
-                effortFilter === option
-                  ? "border-sage-deep bg-sage-deep text-white"
-                  : "border-border-soft bg-card text-text-muted"
+              className={`motion-safe:animate-pop-in shrink-0 rounded-full bg-cream-grey px-3 py-1 text-xs font-medium text-cream-grey-text shadow-sm ${
+                effortFilter === option ? "ring-2 ring-green-deep" : ""
               }`}
             >
               {option}
@@ -80,7 +78,7 @@ export default function WhatCanIMakeList({ cards }: { cards: Card[] }) {
         <select
           value={sortMode}
           onChange={(e) => setSortMode(e.target.value as SortMode)}
-          className="shrink-0 rounded-md border border-border-soft bg-card px-2 py-1 text-xs text-text-muted"
+          className="shrink-0 rounded-[12px] border border-border-soft bg-card px-2 py-1 text-xs text-ink-soft"
         >
           <option value="suggested">Suggested</option>
           <option value="effort">Sort by effort</option>
@@ -89,16 +87,17 @@ export default function WhatCanIMakeList({ cards }: { cards: Card[] }) {
 
       {groups.length === 0 && (
         <EmptyState
-          icon={<IconSoupOff size={40} stroke={1.5} />}
+          emoji="🍲"
           message="No dinner recipes match that effort level."
+          hint="Try a different filter."
         />
       )}
 
       {groups.map((group) => (
         <section key={group.key} className="mb-5">
-          <h2 className="mb-2 text-sm font-semibold text-sage-deep">
+          <h2 className="mb-2 text-sm font-semibold text-green-deep">
             {group.key}{" "}
-            <span className="font-normal text-text-muted">
+            <span className="font-normal text-ink-soft">
               ({group.cards.length})
             </span>
           </h2>
@@ -111,7 +110,7 @@ export default function WhatCanIMakeList({ cards }: { cards: Card[] }) {
                   className="motion-safe:animate-fade-up motion-safe:hover:-translate-y-[3px] motion-safe:transition-transform motion-safe:duration-[180ms] motion-safe:ease-out block rounded-2xl bg-card p-3 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sage-darker">{card.title}</span>
+                    <span className="font-medium text-ink">{card.title}</span>
                     {card.effort && (
                       <span
                         className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${getEffortPillClasses(card.effort)}`}
@@ -121,13 +120,13 @@ export default function WhatCanIMakeList({ cards }: { cards: Card[] }) {
                     )}
                   </div>
                   {card.timeLine && (
-                    <div className="mt-1 flex items-center gap-1 text-xs text-text-muted">
+                    <div className="mt-1 flex items-center gap-1 text-xs text-ink-soft">
                       <IconClock size={13} stroke={1.75} />
                       {card.timeLine}
                     </div>
                   )}
                   {card.missingNames.length > 0 && (
-                    <div className="mt-1 text-xs text-clay">
+                    <div className="mt-1 text-xs text-terracotta-text">
                       Missing: {card.missingNames.join(", ")}
                     </div>
                   )}

@@ -21,7 +21,7 @@ export default function CookButton({ recipeId }: { recipeId: string }) {
           router.refresh();
         });
       }}
-      className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] border border-border-soft bg-white px-3.5 py-3 text-sm font-medium text-sage-darker disabled:opacity-60"
+      className="flex shrink-0 items-center justify-center gap-1.5 rounded-[12px] border-2 border-green-deep bg-white px-3.5 py-3 text-sm font-medium text-ink disabled:opacity-60"
     >
       <IconFlame size={16} stroke={1.75} />
       {done ? "Logged" : isPending ? "Logging…" : "Cooked it"}

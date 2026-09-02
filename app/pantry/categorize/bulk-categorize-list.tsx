@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import type { IngredientCategory } from "@prisma/client";
-import { IconSparkles } from "@tabler/icons-react";
 import { CATEGORY_ORDER, CATEGORY_LABELS } from "@/lib/stockLevel";
 import EmptyState from "@/app/components/empty-state";
 import { updateIngredientCategory } from "../actions";
@@ -25,7 +24,7 @@ export default function BulkCategorizeList({ items: initial }: { items: Item[] }
   if (items.length === 0) {
     return (
       <EmptyState
-        icon={<IconSparkles size={40} stroke={1.5} />}
+        emoji="✨"
         message="Nothing in Other right now, everything's sorted."
       />
     );
@@ -33,16 +32,16 @@ export default function BulkCategorizeList({ items: initial }: { items: Item[] }
 
   return (
     <div>
-      <p className="mb-3 text-xs text-text-muted">{remaining.length} left to sort</p>
+      <p className="mb-3 text-xs text-ink-soft">{remaining.length} left to sort</p>
       <ul className="flex flex-col divide-y divide-border-soft rounded-lg border border-border-soft bg-card">
         {items.map((item) => (
           <li key={item.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
-            <span className="text-sm text-sage-darker">{item.name}</span>
+            <span className="text-sm text-ink">{item.name}</span>
             <select
               className={`rounded border px-1.5 py-1 text-xs ${
                 item.category === "OTHER"
-                  ? "border-clay text-clay"
-                  : "border-border-soft text-sage-darker"
+                  ? "border-terracotta text-terracotta-text"
+                  : "border-border-soft text-ink"
               }`}
               value={item.category}
               onChange={(e) => setCategory(item.id, e.target.value as IngredientCategory)}

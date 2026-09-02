@@ -47,7 +47,7 @@ export default function IngredientInfoRow({
   if (isFunctionOnly) {
     return (
       <li className="px-3 py-2">
-        <span className="rounded-full bg-border-soft px-2 py-0.5 text-xs italic text-text-muted">
+        <span className="rounded-full bg-cream-grey px-2 py-0.5 text-xs italic text-cream-grey-text">
           {rawText} (unspecified)
         </span>
       </li>
@@ -74,39 +74,39 @@ export default function IngredientInfoRow({
   return (
     <li className="px-3 py-2.5">
       <div className="flex items-start gap-2">
-        <span className="w-5 shrink-0 text-xs text-text-muted">{position}.</span>
+        <span className="w-5 shrink-0 text-xs text-ink-soft">{position}.</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span
-              className={`h-2 w-2 shrink-0 rounded-full ${ingredientId ? "bg-sage-deep" : "bg-nav-inactive"}`}
+              className={`h-2 w-2 shrink-0 rounded-full ${ingredientId ? "bg-lime" : "bg-border-soft"}`}
             />
             <button
               type="button"
               disabled={!ingredientId}
               onClick={() => ingredientId && setEditing((e) => !e)}
-              className="text-left text-sm font-medium text-sage-darker disabled:cursor-default"
+              className="text-left text-sm font-medium text-ink disabled:cursor-default"
             >
               {rawText}
             </button>
             {percentage != null && (
-              <span className="rounded-full bg-peridot-tint px-1.5 py-0.5 text-[10px] font-medium text-olive-text">
+              <span className="rounded-full bg-amber-tint px-1.5 py-0.5 text-[10px] font-medium text-amber-text">
                 {formatPercentage(percentage)}%
               </span>
             )}
             {eNumber && (
-              <span className="rounded-full bg-peridot-tint px-1.5 py-0.5 text-[10px] font-medium text-olive-text">
+              <span className="rounded-full bg-amber-tint px-1.5 py-0.5 text-[10px] font-medium text-amber-text">
                 {eNumber}
               </span>
             )}
             {parsedFunctionLabel && (
-              <span className="rounded-full bg-border-soft px-1.5 py-0.5 text-[10px] text-text-muted">
+              <span className="rounded-full bg-cream-grey px-1.5 py-0.5 text-[10px] text-cream-grey-text">
                 {parsedFunctionLabel}
               </span>
             )}
           </div>
 
           {!ingredientId && (
-            <p className="mt-1 text-xs text-text-muted">Not matched to an ingredient yet.</p>
+            <p className="mt-1 text-xs text-ink-soft">Not matched to an ingredient yet.</p>
           )}
 
           {ingredientId && !editing && hasInfo && (
@@ -116,12 +116,12 @@ export default function IngredientInfoRow({
               className="mt-1 block text-left"
             >
               {currentInfo!.functionLabel && (
-                <span className="mr-1.5 rounded-full bg-border-soft px-2 py-0.5 text-xs text-text-muted">
+                <span className="mr-1.5 rounded-full bg-cream-grey px-2 py-0.5 text-xs text-cream-grey-text">
                   {currentInfo!.functionLabel}
                 </span>
               )}
               {currentInfo!.plainEnglish && (
-                <span className="text-xs text-text-muted">{currentInfo!.plainEnglish}</span>
+                <span className="text-xs text-ink-soft">{currentInfo!.plainEnglish}</span>
               )}
             </button>
           )}
@@ -130,22 +130,22 @@ export default function IngredientInfoRow({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="mt-1 text-xs text-sage-deep"
+              className="mt-1 text-xs text-green-deep"
             >
               + Add explanation for &quot;{ingredientName}&quot;
             </button>
           )}
 
           {editing && (
-            <div className="mt-2 flex flex-col gap-2 rounded-lg bg-page-bg p-2.5">
+            <div className="mt-2 flex flex-col gap-2 rounded-lg bg-cream-grey p-2.5">
               <input
-                className="rounded-md border border-border-soft bg-card px-2 py-1.5 text-sm"
+                className="rounded-[12px] border border-border-soft bg-card px-2 py-1.5 text-sm"
                 placeholder="Function, e.g. thickener"
                 value={functionLabel}
                 onChange={(e) => setFunctionLabel(e.target.value)}
               />
               <textarea
-                className="rounded-md border border-border-soft bg-card px-2 py-1.5 text-sm"
+                className="rounded-[12px] border border-border-soft bg-card px-2 py-1.5 text-sm"
                 rows={2}
                 placeholder="Plain-English explanation"
                 value={plainEnglish}
@@ -156,7 +156,7 @@ export default function IngredientInfoRow({
                   type="button"
                   disabled={isPending}
                   onClick={handleSave}
-                  className="rounded-md bg-sage-deep px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                  className="rounded-[12px] bg-green-deep px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {isPending ? "Saving…" : "Save"}
                 </button>
@@ -167,7 +167,7 @@ export default function IngredientInfoRow({
                     setPlainEnglish(currentInfo?.plainEnglish ?? "");
                     setEditing(false);
                   }}
-                  className="text-xs text-text-muted"
+                  className="text-xs text-ink-soft"
                 >
                   Cancel
                 </button>

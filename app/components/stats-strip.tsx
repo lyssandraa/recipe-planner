@@ -41,10 +41,10 @@ export default function StatsStrip({ cells }: { cells: StatCell[] }) {
 function StatCellView({ cell }: { cell: StatCell }) {
   return (
     <div className="flex flex-col items-center justify-center gap-0.5 px-2 py-3 text-center">
-      <div className={`text-base font-semibold text-sage-darker ${cell.valueClassName ?? ""}`}>
+      <div className={`text-base font-semibold text-ink ${cell.valueClassName ?? ""}`}>
         {cell.value}
       </div>
-      <div className="text-[11px] text-text-muted">{cell.label}</div>
+      <div className="text-[11px] text-ink-soft">{cell.label}</div>
     </div>
   );
 }

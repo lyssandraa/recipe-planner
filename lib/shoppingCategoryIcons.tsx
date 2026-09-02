@@ -1,46 +1,36 @@
 import type { JSX } from "react";
-import {
-  IconBasket,
-  IconBottle,
-  IconCarrot,
-  IconMeat,
-  IconMilk,
-  IconPepper,
-  IconSnowflake,
-  IconWheat,
-} from "@tabler/icons-react";
 import type { IngredientCategory } from "@prisma/client";
 
 export type ShoppingCategoryIconProps = {
   size?: number;
-  stroke?: number;
   className?: string;
 };
 
-// Icon per category for the shopping list's group headers. Kept separate
+// Emoji per category for the shopping list's group headers. Kept separate
 // from lib/categoryIcons.tsx (the pantry's row icons) since "Other" reads
-// better here as a basket than a box, and Tabler has no jar icon, a
-// bottle is the closest stand-in for tins and jars.
+// better here as a basket than a box.
+const SHOPPING_CATEGORY_EMOJI: Record<IngredientCategory, string> = {
+  PRODUCE: "🥕",
+  MEAT_FISH: "🥩",
+  DAIRY: "🥛",
+  DRY_GOODS: "🌾",
+  TINS_JARS: "🥫",
+  SPICES: "🧂",
+  FROZEN: "❄️",
+  OTHER: "🧺",
+};
+
+export function getShoppingCategoryEmoji(category: IngredientCategory): string {
+  return SHOPPING_CATEGORY_EMOJI[category];
+}
+
 export function renderShoppingCategoryIcon(
   category: IngredientCategory,
   props: ShoppingCategoryIconProps
 ): JSX.Element {
-  switch (category) {
-    case "PRODUCE":
-      return <IconCarrot {...props} />;
-    case "MEAT_FISH":
-      return <IconMeat {...props} />;
-    case "DAIRY":
-      return <IconMilk {...props} />;
-    case "DRY_GOODS":
-      return <IconWheat {...props} />;
-    case "TINS_JARS":
-      return <IconBottle {...props} />;
-    case "SPICES":
-      return <IconPepper {...props} />;
-    case "FROZEN":
-      return <IconSnowflake {...props} />;
-    case "OTHER":
-      return <IconBasket {...props} />;
-  }
+  return (
+    <span style={{ fontSize: props.size ?? 16, lineHeight: 1 }} className={props.className}>
+      {SHOPPING_CATEGORY_EMOJI[category]}
+    </span>
+  );
 }

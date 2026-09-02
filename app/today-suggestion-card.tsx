@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { IconDice5, IconSparkles } from "@tabler/icons-react";
+import { IconDice5 } from "@tabler/icons-react";
 import { getEffortPillClasses, type EffortLabel } from "@/lib/effort";
 
 export type TodayCandidate = {
@@ -10,6 +10,9 @@ export type TodayCandidate = {
   title: string;
   effort: EffortLabel | null;
   timeLine: string | null;
+  batchFriendly: boolean;
+  emoji: string;
+  colorClass: string;
 };
 
 // A shuffled, fixed order the reroll button steps through, rather than a
@@ -30,12 +33,9 @@ export default function TodaySuggestionCard({ candidates }: { candidates: TodayC
 
   if (order.length === 0) {
     return (
-      <div className="rounded-2xl bg-card p-4 shadow-sm">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-sage-deep">
-          <IconSparkles size={16} stroke={1.75} />
-          What should I cook today
-        </div>
-        <p className="mt-1.5 text-sm text-text-muted">
+      <div className="rounded-2xl bg-cream-grey p-4 shadow-sm">
+        <p className="text-sm font-semibold text-ink">🎲 What should I cook today</p>
+        <p className="mt-1.5 text-sm text-cream-grey-text">
           Nothing quite fits right now, nothing you have everything for looks
           right for today. Check What Can I Make for the full list.
         </p>
@@ -46,35 +46,51 @@ export default function TodaySuggestionCard({ candidates }: { candidates: TodayC
   const pick = order[index % order.length];
 
   return (
-    <div className="rounded-2xl bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-sage-deep">
-        <IconSparkles size={16} stroke={1.75} />
-        What should I cook today
-      </div>
-      <Link
-        href={`/recipes/${pick.id}`}
-        className="mt-2 flex items-center justify-between gap-2"
-      >
-        <span className="font-medium text-sage-darker">{pick.title}</span>
-        {pick.effort && (
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${getEffortPillClasses(pick.effort)}`}
+    <div className="overflow-hidden rounded-2xl border-2 border-amber bg-card">
+      <div className="flex items-center justify-between bg-amber px-4 py-2">
+        <span className="text-[11px] font-bold tracking-wide text-amber-text uppercase">
+          Tonight&apos;s pick
+        </span>
+        {order.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setIndex((i) => i + 1)}
+            className="flex items-center gap-1 rounded-full bg-card px-2.5 py-1 text-[11px] font-semibold text-amber-text"
           >
-            {pick.effort}
-          </span>
+            <IconDice5 size={12} stroke={2} />
+            Reroll
+          </button>
         )}
-      </Link>
-      {pick.timeLine && <p className="mt-1 text-xs text-text-muted">{pick.timeLine}</p>}
-      {order.length > 1 && (
-        <button
-          type="button"
-          onClick={() => setIndex((i) => i + 1)}
-          className="mt-2 flex items-center gap-1 text-xs text-sage-deep"
+      </div>
+      <Link href={`/recipes/${pick.id}`} className="flex items-center gap-3 p-4">
+        <span
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-2xl ${pick.colorClass}`}
         >
-          <IconDice5 size={14} stroke={1.75} />
-          Something else
-        </button>
-      )}
+          {pick.emoji}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-ink">{pick.title}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {pick.effort && (
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${getEffortPillClasses(pick.effort)}`}
+              >
+                {pick.effort}
+              </span>
+            )}
+            {pick.timeLine && (
+              <span className="shrink-0 rounded-full bg-cream-grey px-2 py-0.5 text-[11px] font-medium text-cream-grey-text">
+                {pick.timeLine}
+              </span>
+            )}
+            {pick.batchFriendly && (
+              <span className="shrink-0 rounded-full bg-amber-tint px-2 py-0.5 text-[11px] font-medium text-amber-text">
+                batch
+              </span>
+            )}
+          </div>
+        </div>
+      </Link>
     </div>
   );
 }

@@ -17,7 +17,7 @@ export default async function NewProductPage({
         backFallbackHref="/scan"
       />
       <div className="p-4">
-        <p className="mb-4 text-sm text-text-muted">
+        <p className="mb-4 text-sm text-ink-soft">
           {barcode
             ? "Couldn't find that barcode on Open Food Facts, enter the details by hand."
             : "Enter the product details by hand."}

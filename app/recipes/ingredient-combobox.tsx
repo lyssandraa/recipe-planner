@@ -75,7 +75,7 @@ export default function IngredientCombobox({
   return (
     <div ref={containerRef} className="relative" onBlur={handleBlur}>
       <input
-        className="w-full rounded-md border border-border-soft px-2 py-1.5 text-sm"
+        className="w-full rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
         placeholder="Search ingredient…"
         value={query}
         onChange={(e) => {
@@ -85,12 +85,12 @@ export default function IngredientCombobox({
         onFocus={() => setOpen(true)}
       />
       {open && (
-        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-border-soft bg-card shadow-md">
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-[12px] border border-border-soft bg-card shadow-md">
           {filtered.map((option) => (
             <button
               type="button"
               key={option.id}
-              className="block w-full px-2 py-1.5 text-left text-sm hover:bg-page-bg"
+              className="block w-full px-2 py-1.5 text-left text-sm hover:bg-cream"
               onMouseDown={() => {
                 onChange(option);
                 setQuery(option.name);
@@ -99,12 +99,12 @@ export default function IngredientCombobox({
             >
               {option.name}
               {option.isStaple && (
-                <span className="ml-1 text-xs text-text-muted">(staple)</span>
+                <span className="ml-1 text-xs text-ink-soft">(staple)</span>
               )}
             </button>
           ))}
           {filtered.length === 0 && !query.trim() && (
-            <div className="px-2 py-1.5 text-sm text-text-muted">
+            <div className="px-2 py-1.5 text-sm text-ink-soft">
               Type to search…
             </div>
           )}
@@ -112,16 +112,16 @@ export default function IngredientCombobox({
             <div className="border-t border-border-soft p-2">
               <button
                 type="button"
-                className="block w-full rounded px-2 py-1.5 text-left text-sm text-sage-deep hover:bg-page-bg disabled:opacity-50"
+                className="block w-full rounded px-2 py-1.5 text-left text-sm text-green-deep hover:bg-cream disabled:opacity-50"
                 disabled={creating}
                 onMouseDown={handleCreate}
               >
                 {creating ? "Creating…" : `+ Create "${query.trim()}"`}
               </button>
-              <label className="mt-1 flex items-center gap-2 px-2 text-xs text-text-muted">
+              <label className="mt-1 flex items-center gap-2 px-2 text-xs text-ink-soft">
                 Category
                 <select
-                  className="flex-1 rounded border border-border-soft px-1.5 py-1 text-xs text-sage-darker"
+                  className="flex-1 rounded border border-border-soft px-1.5 py-1 text-xs text-ink"
                   value={effectiveCategory}
                   onChange={(e) => {
                     setCategory(e.target.value as IngredientCategory);

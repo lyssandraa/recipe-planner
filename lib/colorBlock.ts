@@ -9,7 +9,7 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
-const CARD_COLORS = ["bg-peridot", "bg-mint", "bg-sage-light"] as const;
+const CARD_COLORS = ["bg-terracotta", "bg-amber", "bg-lime", "bg-green-deep"] as const;
 
 export function getCardColorClass(id: string): string {
   return CARD_COLORS[hashString(id) % CARD_COLORS.length];

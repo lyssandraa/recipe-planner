@@ -36,7 +36,7 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="motion-safe:animate-fade-up-sm flex items-center gap-2 rounded-full bg-sage-deep px-4 py-2.5 text-sm font-medium text-white shadow-lg"
+            className="motion-safe:animate-fade-up-sm flex items-center gap-2 rounded-full bg-green-deep px-4 py-2.5 text-sm font-medium text-white shadow-lg"
           >
             <IconCheck size={15} stroke={2.5} />
             {t.text}

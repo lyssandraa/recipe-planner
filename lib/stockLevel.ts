@@ -9,15 +9,29 @@ export const STOCK_LEVEL_LABELS: Record<StockLevel, string> = {
 };
 
 // Tailwind classes for the stock level toggle, using the theme tokens only.
+// Same state-colour convention as effort: lime for plenty, amber for low,
+// terracotta for out.
 export function getStockLevelClasses(level: StockLevel, active: boolean): string {
-  if (!active) return "bg-card text-text-muted border border-border-soft";
+  if (!active) return "bg-card text-ink-soft border border-border-soft";
   switch (level) {
     case "PLENTY":
-      return "bg-sage-deep text-white";
+      return "bg-lime-tint text-green-deep";
     case "LOW":
-      return "bg-peridot-tint text-olive-text";
+      return "bg-amber-tint text-amber-text";
     case "OUT":
-      return "bg-nav-inactive text-white";
+      return "bg-terracotta-tint text-terracotta-text";
+  }
+}
+
+// Plain text colour for the stock level, e.g. the pantry header's count row.
+export function getStockLevelTextClass(level: StockLevel): string {
+  switch (level) {
+    case "PLENTY":
+      return "text-lime";
+    case "LOW":
+      return "text-amber";
+    case "OUT":
+      return "text-terracotta";
   }
 }
 
@@ -55,4 +69,18 @@ export const CATEGORY_LABELS: Record<IngredientCategory, string> = {
   SPICES: "Spices",
   FROZEN: "Frozen",
   OTHER: "Other",
+};
+
+// The 3px card bottom-border colour per category, spread across the full
+// palette (not shades of one colour) so a category is findable by colour
+// alone.
+export const CATEGORY_BORDER_CLASS: Record<IngredientCategory, string> = {
+  PRODUCE: "border-lime",
+  MEAT_FISH: "border-terracotta",
+  DAIRY: "border-teal-tint",
+  DRY_GOODS: "border-amber",
+  TINS_JARS: "border-pink-tint",
+  SPICES: "border-amber-tint",
+  FROZEN: "border-cream-grey",
+  OTHER: "border-green-deep",
 };

@@ -1,24 +1,39 @@
 @import "tailwindcss";
 
-/* "sage peridot morning" palette, named tokens only, no scattered hex
-   values in components. Mint and peridot are light: use them only as
-   backgrounds with dark text on top, never as text/icon colours. */
+/* "kitchen warm" palette, named tokens only, no scattered hex values in
+   components. Tints (amber/terracotta/lime/cream-grey/pink/teal) are
+   light: use them only as backgrounds with their matching -text colour
+   on top, never as text/icon colours directly. Full-saturation anchors
+   (green-deep/lime/amber/terracotta) work as text/icons only against
+   dark green-deep surfaces (headers) or as solid block fills; on
+   card/cream surfaces use the tint + matching -text pair instead. */
 @theme {
-  --color-sage-deep: #345c32;
-  --color-peridot: #9cac54;
-  --color-mint: #a7f0dd;
-  --color-sage-light: #97cd97;
-  --color-sage-darker: #1e3a1d;
-  --color-page-bg: #f6f9f2;
+  --color-green-deep: #2f5e3a;
+  --color-lime: #8dc63f;
+  --color-amber: #f2a03d;
+  --color-terracotta: #e8613c;
+  --color-cream: #fff8ee;
   --color-card: #ffffff;
-  --color-text-muted: #5c7159;
-  --color-nav-inactive: #a3b39f;
-  --color-border-soft: #e4ede0;
-  --color-olive-text: #3e3a12;
-  --color-peridot-tint: #e4ebc4;
-  /* Warm, saturated tone for High effort, reads as "more work" against
-     the cool sage/peridot/mint palette, paired with white text like Low. */
-  --color-clay: #c1694b;
+  --color-ink: #22331f;
+  --color-ink-soft: #7c8a78;
+
+  --color-amber-tint: #ffe9cc;
+  --color-terracotta-tint: #ffddd3;
+  --color-lime-tint: #dcefd4;
+  --color-cream-grey: #f6f3ec;
+  --color-pink-tint: #f6ddf0;
+  --color-teal-tint: #cfe9e4;
+
+  --color-amber-text: #8a4b12;
+  --color-terracotta-text: #973219;
+  --color-lime-text: #2f5e3a;
+  --color-cream-grey-text: #8a9686;
+
+  /* Warm neutral divider/input border. Never used on card edges (cards
+     take a 3px category-colour bottom border instead), only on inputs,
+     list dividers and unselected chip/pill outlines. */
+  --color-border-soft: #ede6d8;
+  --color-nav-inactive: #a9ab93;
 
   --animate-fade-up: fade-up 0.45s ease-out both;
   --animate-fade-up-sm: fade-up-sm 0.4s ease-out both;
@@ -77,15 +92,15 @@
 }
 
 body {
-  background: var(--color-page-bg);
-  color: var(--color-sage-darker);
+  background: var(--color-cream);
+  color: var(--color-ink);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
 }
 
 input[type="checkbox"] {
-  accent-color: var(--color-sage-deep);
+  accent-color: var(--color-green-deep);
 }
 
 /* Every button gets a pressed state for free, rather than relying on each

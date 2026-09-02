@@ -62,8 +62,16 @@ export default async function WhatCanIMakePage() {
     <div>
       <PageHeader
         title="What can I make"
-        subtitle={`${readyCount} of ${cards.length} dinners ready to go`}
         icon={<IconChefHat size={24} stroke={1.75} />}
+        accents={["lime", "amber"]}
+        extra={
+          <div>
+            <div className="text-[17px] font-semibold text-lime">{readyCount}</div>
+            <div className="text-[11px] text-white/70">
+              of {cards.length} dinners ready to go
+            </div>
+          </div>
+        }
       />
       <div className="p-4">
         <WhatCanIMakeList cards={cards} />
