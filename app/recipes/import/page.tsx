@@ -10,7 +10,11 @@ export default async function ImportRecipePage() {
 
   return (
     <div>
-      <PageHeader title="Import from a URL" icon={<IconLink size={24} stroke={1.75} />} />
+      <PageHeader
+        title="Import from a URL"
+        icon={<IconLink size={24} stroke={1.75} />}
+        backFallbackHref="/recipes"
+      />
       <div className="p-4">
         <ImportForm ingredientOptions={ingredients} />
       </div>

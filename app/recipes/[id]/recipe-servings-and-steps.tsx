@@ -2,20 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  IconCarrot,
-  IconChefHat,
-  IconClock,
-  IconListNumbers,
-  IconMicrowave,
-  IconMinus,
-  IconPlus,
-} from "@tabler/icons-react";
-import type { Unit } from "@prisma/client";
+import { IconChefHat, IconClock, IconMinus, IconPlus } from "@tabler/icons-react";
+import type { IngredientCategory, Unit } from "@prisma/client";
 import { scaleQuantity } from "@/lib/servingScale";
 import { formatQuantityUnit } from "@/lib/units";
+import { getStaticStorageAdvice } from "@/lib/storageAdvice";
 import { formatTimer, getStepIngredientIds, type RecipeStep } from "@/lib/instructions";
 import DetailCard from "@/app/components/detail-card";
+import StorageAdviceToggle from "@/app/components/storage-advice-toggle";
 import CookButton from "./cook-button";
 
 export type StepIngredientData = {
@@ -25,7 +19,13 @@ export type StepIngredientData = {
   unit: Unit | null;
   note: string | null;
   optional: boolean;
-  ingredient: { name: string; plural: string | null; isStaple: boolean };
+  ingredient: {
+    name: string;
+    plural: string | null;
+    isStaple: boolean;
+    storageAdvice: string | null;
+    category: IngredientCategory;
+  };
 };
 
 export default function RecipeServingsAndSteps({
@@ -73,7 +73,7 @@ export default function RecipeServingsAndSteps({
       <div className="flex gap-2.5">
         <Link
           href={`/recipes/${recipeId}/cook?servings=${servings}`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-sage-deep px-4 py-3 text-sm font-medium text-white"
+          className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-green-deep px-4 py-3 text-sm font-medium text-white"
         >
           <IconChefHat size={18} stroke={1.75} />
           Cook
@@ -82,27 +82,28 @@ export default function RecipeServingsAndSteps({
       </div>
 
       <DetailCard
-        icon={<IconCarrot size={19} stroke={1.75} />}
+        emoji="🥕"
         title="Ingredients"
+        borderClassName="border-lime"
         meta={
           canScale && (
-            <div className="flex items-center gap-2 rounded-full bg-page-bg py-1 pr-1 pl-2">
+            <div className="flex items-center gap-2 rounded-full bg-cream-grey py-1 pr-1 pl-2">
               <button
                 type="button"
                 onClick={() => setServings((s) => Math.max(1, s - 1))}
                 aria-label="Fewer servings"
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-sage-deep shadow-sm"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-green-deep shadow-sm"
               >
                 <IconMinus size={13} stroke={2} />
               </button>
-              <span className="w-4 text-center text-sm font-semibold text-sage-darker">
+              <span className="w-4 text-center text-sm font-semibold text-ink">
                 {servings}
               </span>
               <button
                 type="button"
                 onClick={() => setServings((s) => s + 1)}
                 aria-label="More servings"
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-deep text-white"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-green-deep text-white"
               >
                 <IconPlus size={13} stroke={2} />
               </button>
@@ -113,7 +114,7 @@ export default function RecipeServingsAndSteps({
         style={{ animationDelay: `${ingredientsDelay * 80}ms` }}
       >
         {canScale && (
-          <p className="-mt-2 mb-2 text-[11px] text-text-muted">original: {originalServings}</p>
+          <p className="-mt-2 mb-2 text-[11px] text-ink-soft">original: {originalServings}</p>
         )}
 
         <ul className="flex flex-col divide-y divide-border-soft">
@@ -126,25 +127,33 @@ export default function RecipeServingsAndSteps({
                 : ri.ingredient.name;
             const amount = formatQuantityUnit(scaledQty, ri.unit);
             const inPantry = pantrySet.has(ri.ingredientId) || !!substitutions[ri.ingredientId];
+            const resolvedAdvice =
+              ri.ingredient.storageAdvice ??
+              getStaticStorageAdvice(ri.ingredient.name, ri.ingredient.category);
 
             return (
               <li key={ri.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                <span className="w-[66px] shrink-0 text-sm font-semibold text-sage-deep">
+                <span className="w-[66px] shrink-0 text-sm font-semibold text-green-deep">
                   {amount}
                 </span>
-                <span className="min-w-0 flex-1 text-sm text-sage-darker">
+                <span className="min-w-0 flex-1 text-sm text-ink">
                   {displayName}
-                  {ri.note && <span className="ml-1 text-xs text-text-muted">, {ri.note}</span>}
-                  {ri.optional && <span className="ml-1 text-xs text-text-muted">(optional)</span>}
+                  {ri.note && <span className="ml-1 text-xs text-ink-soft">, {ri.note}</span>}
+                  {ri.optional && <span className="ml-1 text-xs text-ink-soft">(optional)</span>}
                   {substitutions[ri.ingredientId] && (
-                    <span className="ml-1 text-xs text-text-muted">
+                    <span className="ml-1 text-xs text-ink-soft">
                       (using {substitutions[ri.ingredientId]})
                     </span>
                   )}
+                  <StorageAdviceToggle
+                    ingredientId={ri.ingredientId}
+                    advice={resolvedAdvice}
+                    hasCustom={ri.ingredient.storageAdvice != null}
+                  />
                 </span>
                 <span
                   className={`h-[7px] w-[7px] shrink-0 rounded-full ${
-                    inPantry ? "bg-peridot" : "bg-border-soft"
+                    inPantry ? "bg-lime" : "bg-border-soft"
                   }`}
                 />
               </li>
@@ -155,7 +164,7 @@ export default function RecipeServingsAndSteps({
         {staples.length > 0 && (
           <div className="mt-3 border-t border-border-soft pt-3">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-text-muted">Store cupboard:</span>
+              <span className="text-xs text-ink-soft">Store cupboard:</span>
               {staples.map((ri) => {
                 const scaledQty = canScale
                   ? scaleQuantity(ri.quantity, ri.unit, factor)
@@ -164,7 +173,7 @@ export default function RecipeServingsAndSteps({
                 return (
                   <span
                     key={ri.id}
-                    className="rounded-full bg-page-bg px-2 py-0.5 text-xs text-sage-darker"
+                    className="rounded-full bg-cream-grey px-2 py-0.5 text-xs text-ink"
                   >
                     {amount ? `${amount} ` : ""}
                     {ri.ingredient.name}
@@ -178,22 +187,23 @@ export default function RecipeServingsAndSteps({
 
       {leftoverNote && (
         <div
-          className="motion-safe:animate-fade-up-sm rounded-[14px] bg-mint/40 p-4"
+          className="motion-safe:animate-fade-up-sm rounded-2xl bg-lime-tint p-4 shadow-sm"
           style={{ animationDelay: `${(leftoverDelay ?? 0) * 80}ms` }}
         >
           <div className="mb-1 flex items-center gap-1.5">
-            <IconMicrowave size={16} stroke={1.75} className="text-olive-text" />
-            <span className="text-sm font-bold text-olive-text">Leftovers</span>
+            <span className="text-sm">🍱</span>
+            <span className="text-sm font-bold text-green-deep">Leftovers</span>
           </div>
-          <p className="text-sm text-olive-text">{leftoverNote}</p>
+          <p className="text-sm text-green-deep">{leftoverNote}</p>
         </div>
       )}
 
       <DetailCard
-        icon={<IconListNumbers size={19} stroke={1.75} />}
+        emoji="👣"
         title="Method"
+        borderClassName="border-amber"
         meta={
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-ink-soft">
             {steps.length} step{steps.length === 1 ? "" : "s"}
           </span>
         }
@@ -211,17 +221,17 @@ export default function RecipeServingsAndSteps({
             return (
               <li key={i} className="flex gap-3">
                 <div className="flex flex-col items-center">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sage-light/35 text-xs font-semibold text-sage-deep">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-lime-tint text-xs font-semibold text-green-deep">
                     {i + 1}
                   </span>
                   {!isLast && <span className="mt-1 w-[1.5px] flex-1 bg-border-soft" />}
                 </div>
                 <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-5"}`}>
-                  <p className="text-sm leading-[1.5] text-sage-darker">{step.text}</p>
+                  <p className="text-sm leading-[1.5] text-ink">{step.text}</p>
                   {(stepIngredients.length > 0 || step.timerSeconds != null) && (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {step.timerSeconds != null && (
-                        <span className="flex items-center gap-1 rounded-[6px] bg-peridot-tint px-2 py-1 text-xs text-olive-text">
+                        <span className="flex items-center gap-1 rounded-[6px] bg-amber-tint px-2 py-1 text-xs text-amber-text">
                           <IconClock size={12} stroke={1.75} />
                           {formatTimer(step.timerSeconds)}
                         </span>
@@ -233,7 +243,7 @@ export default function RecipeServingsAndSteps({
                         return (
                           <span
                             key={si.id}
-                            className="rounded-[6px] bg-sage-light/35 px-2 py-1 text-xs text-sage-darker"
+                            className="rounded-[6px] bg-lime-tint px-2 py-1 text-xs text-green-deep"
                           >
                             {formatQuantityUnit(scaledQty, si.unit)} {si.ingredient.name}
                           </span>
