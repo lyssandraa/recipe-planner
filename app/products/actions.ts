@@ -107,6 +107,20 @@ export async function lookupBarcode(barcode: string): Promise<LookupBarcodeResul
           fresh.rawIngredientsText,
           fresh.nutritionPer100g
         );
+
+        // A manual correction always wins over whatever the API says, on
+        // this scan and every one after it, so the origin fields are left
+        // untouched (and effectively unused) while one is set.
+        if (!existing.originOverride) {
+          await prisma.product.update({
+            where: { id: existing.id },
+            data: {
+              ingredientOrigin: fresh.ingredientOrigin,
+              manufacturingPlace: fresh.manufacturingPlace,
+              soldIn: fresh.soldIn,
+            },
+          });
+        }
       }
     }
 
@@ -131,8 +145,9 @@ export async function lookupBarcode(barcode: string): Promise<LookupBarcodeResul
       brand: result.brand,
       rawIngredientsText: result.rawIngredientsText,
       ingredientsLanguage: result.ingredientsLanguage,
-      countryOfOrigin: result.countryOfOrigin,
-      countryTags: result.countryTags.length > 0 ? result.countryTags : undefined,
+      ingredientOrigin: result.ingredientOrigin,
+      manufacturingPlace: result.manufacturingPlace,
+      soldIn: result.soldIn,
       nutritionPer100g: asJson(result.nutritionPer100g),
       imageUrl: result.imageUrl,
       source: "OPEN_FOOD_FACTS",
@@ -172,7 +187,7 @@ export type ManualProductInput = {
   barcode: string;
   name: string;
   brand: string | null;
-  countryOfOrigin: string | null;
+  ingredientOrigin: string | null;
   rawIngredientsText: string | null;
   imageUrl: string | null;
 };
@@ -186,7 +201,7 @@ export async function createManualProduct(input: ManualProductInput) {
       barcode: input.barcode.trim(),
       name: input.name.trim(),
       brand: input.brand,
-      countryOfOrigin: input.countryOfOrigin,
+      ingredientOrigin: input.ingredientOrigin,
       rawIngredientsText: input.rawIngredientsText,
       imageUrl: input.imageUrl,
       source: "MANUAL",
@@ -276,6 +291,18 @@ export async function createIngredientAndAddToPantry(
   return { matched: true, ingredientName: ingredient.name };
 }
 
+// Empty clears the override, reverting to whatever the API fields (or lack
+// of them) resolve to. Set, it takes priority over ingredientOrigin,
+// manufacturingPlace and soldIn for display, and is preserved across future
+// rescans rather than getting overwritten by fresh API data.
+export async function setOriginOverride(productId: string, value: string | null) {
+  await prisma.product.update({
+    where: { id: productId },
+    data: { originOverride: value?.trim() || null },
+  });
+  revalidatePath(`/products/${productId}`);
+}
+
 export async function saveIngredientInfo(
   ingredientId: string,
   input: { functionLabel: string | null; plainEnglish: string | null }
@@ -294,16 +321,21 @@ export async function saveIngredientInfo(
   });
 }
 
+// explanation is required for a matched claim type (CERTIFIED, REGULATED,
+// UNREGULATED all come with a definition from lib/claims.ts), but optional
+// for UNRECOGNISED, where the user may not have anything to add yet.
 export async function addManualClaim(
   productId: string,
   claimText: string,
   claimType: ClaimType,
-  explanation: string
+  explanation: string | null
 ) {
   const trimmedText = claimText.trim();
-  const trimmedExplanation = explanation.trim();
+  const trimmedExplanation = explanation?.trim() || null;
   if (!trimmedText) throw new Error("Claim text is required.");
-  if (!trimmedExplanation) throw new Error("An explanation is required.");
+  if (claimType !== "UNRECOGNISED" && !trimmedExplanation) {
+    throw new Error("An explanation is required.");
+  }
 
   const claim = await prisma.productClaim.create({
     data: {

@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { IconCarrot, IconCertificate, IconChartPie, IconFridge, IconLanguage } from "@tabler/icons-react";
+import { IconLanguage } from "@tabler/icons-react";
 import { prisma } from "@/lib/prisma";
-import { getCountryDisplay } from "@/lib/countries";
 import { languageName } from "@/lib/languages";
 import { getNutritionSummary } from "@/lib/nutrition";
 import { getStaticStorageAdvice } from "@/lib/storageAdvice";
@@ -15,6 +14,7 @@ import AddToPantryButton from "./add-to-pantry-button";
 import IngredientInfoRow from "./ingredient-info-row";
 import CompositionBar from "./composition-bar";
 import ClaimsCard from "./claims-card";
+import OriginCard from "./origin-card";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +36,6 @@ export default async function ProductDetailPage({
   });
   if (!product) notFound();
 
-  const country = getCountryDisplay(
-    (product.countryTags as string[] | null) ?? null,
-    product.countryOfOrigin
-  );
   const nutrition = getNutritionSummary(product.nutritionPer100g);
 
   const resolvedIngredientId = await resolveIngredientId(product.name);
@@ -51,18 +47,27 @@ export default async function ProductDetailPage({
       getStaticStorageAdvice(resolvedIngredient.name, resolvedIngredient.category))
     : null;
 
-  const heroSubtitle = [
-    product.brand,
-    country ? [country.flag, country.label].filter(Boolean).join(" ") : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const heroSubtitle = product.brand ?? "";
 
   const statCells: StatCell[] = nutrition.map((n) => ({ value: n.value, label: n.label }));
+
+  // Purely descriptive, no score or judgement, just a heads-up that some of
+  // what's on the pack is marketing language rather than a legal or
+  // audited claim.
+  const noLegalDefinitionCount = product.claims.filter(
+    (c) => c.claimType === "UNREGULATED" || c.claimType === "UNRECOGNISED"
+  ).length;
+  const claimsMeta =
+    product.claims.length === 0
+      ? null
+      : noLegalDefinitionCount > 0
+        ? `${product.claims.length} claim${product.claims.length === 1 ? "" : "s"}, ${noLegalDefinitionCount} with no legal definition`
+        : `${product.claims.length} claim${product.claims.length === 1 ? "" : "s"}`;
 
   const showStorage = !!(resolvedIngredient && resolvedAdvice);
   let nextDelay = 0;
   const storageDelay = showStorage ? nextDelay++ : null;
+  const originDelay = nextDelay++;
   const compositionDelay = nextDelay++;
   const ingredientsDelay = nextDelay++;
   const claimsDelay = nextDelay++;
@@ -72,6 +77,8 @@ export default async function ProductDetailPage({
       <DetailHero
         imageUrl={product.imageUrl}
         colorBlockClass={getCardColorClass(product.id)}
+        emoji="🛒"
+        accentClassName="bg-terracotta"
         title={product.name}
         subtitle={heroSubtitle || null}
         backFallbackHref="/scan"
@@ -81,18 +88,13 @@ export default async function ProductDetailPage({
 
       <div className="flex flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-border-soft px-2 py-1 text-xs text-sage-darker">
+          <span className="rounded-full bg-cream-grey px-2 py-1 text-xs text-cream-grey-text">
             {product.source === "OPEN_FOOD_FACTS" ? "Open Food Facts" : "Added manually"}
           </span>
-          {country && country.otherCount > 0 && (
-            <span className="text-xs text-text-muted">
-              +{country.otherCount} other{country.otherCount === 1 ? "" : "s"}
-            </span>
-          )}
         </div>
 
         {product.ingredientsLanguage && (
-          <p className="flex items-center gap-2 rounded-lg bg-peridot-tint p-3 text-sm text-olive-text">
+          <p className="flex items-center gap-2 rounded-lg bg-amber-tint p-3 text-sm text-amber-text">
             <IconLanguage size={16} stroke={1.75} className="shrink-0" />
             This label&apos;s ingredient text is in {languageName(product.ingredientsLanguage)},
             not English, so matching against your ingredient catalog will likely miss.
@@ -101,8 +103,9 @@ export default async function ProductDetailPage({
 
         {showStorage && (
           <DetailCard
-            icon={<IconFridge size={19} stroke={1.75} />}
+            emoji="🧊"
             title="Storage"
+            borderClassName="border-teal-tint"
             meta={
               <StorageAdviceToggle
                 ingredientId={resolvedIngredient!.id}
@@ -115,9 +118,21 @@ export default async function ProductDetailPage({
           />
         )}
 
+        <OriginCard
+          productId={product.id}
+          barcode={product.barcode}
+          ingredientOrigin={product.ingredientOrigin}
+          manufacturingPlace={product.manufacturingPlace}
+          soldIn={product.soldIn}
+          originOverride={product.originOverride}
+          className="motion-safe:animate-fade-up-sm"
+          style={{ animationDelay: `${originDelay * 80}ms` }}
+        />
+
         <DetailCard
-          icon={<IconChartPie size={19} stroke={1.75} />}
+          emoji="🥧"
           title="Composition"
+          borderClassName="border-amber"
           className="motion-safe:animate-fade-up-sm"
           style={{ animationDelay: `${compositionDelay * 80}ms` }}
         >
@@ -130,10 +145,11 @@ export default async function ProductDetailPage({
         </DetailCard>
 
         <DetailCard
-          icon={<IconCarrot size={19} stroke={1.75} />}
+          emoji="📋"
           title="Ingredients"
+          borderClassName="border-terracotta"
           meta={
-            <span className="text-xs text-text-muted">
+            <span className="text-xs text-ink-soft">
               {product.ingredients.length} item{product.ingredients.length === 1 ? "" : "s"}
             </span>
           }
@@ -141,7 +157,7 @@ export default async function ProductDetailPage({
           style={{ animationDelay: `${ingredientsDelay * 80}ms` }}
         >
           {product.ingredients.length === 0 ? (
-            <p className="text-sm text-text-muted">No ingredients list recorded.</p>
+            <p className="text-sm text-ink-soft">No ingredients list recorded.</p>
           ) : (
             <ul className="flex flex-col divide-y divide-border-soft">
               {(() => {
@@ -170,8 +186,10 @@ export default async function ProductDetailPage({
         </DetailCard>
 
         <DetailCard
-          icon={<IconCertificate size={19} stroke={1.75} />}
+          emoji="🏅"
           title="Front of pack claims"
+          borderClassName="border-lime"
+          meta={claimsMeta && <span className="text-xs text-ink-soft">{claimsMeta}</span>}
           className="motion-safe:animate-fade-up-sm"
           style={{ animationDelay: `${claimsDelay * 80}ms` }}
         >
