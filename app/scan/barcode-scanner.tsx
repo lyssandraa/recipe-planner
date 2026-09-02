@@ -22,12 +22,27 @@ export default function BarcodeScanner() {
     if (!cameraOpen) return;
     let cancelled = false;
 
-    import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
+    import("html5-qrcode").then(({ Html5QrcodeScanner, Html5QrcodeSupportedFormats }) => {
       if (cancelled) return;
 
       const scanner = new Html5QrcodeScanner(
         SCANNER_ELEMENT_ID,
-        { fps: 10, qrbox: { width: 260, height: 150 } },
+        {
+          fps: 10,
+          qrbox: { width: 260, height: 150 },
+          // The native BarcodeDetector path (the library's default when the
+          // browser supports it) is unreliable for 1D barcodes on many
+          // phones, it works for QR but silently misses EAN/UPC codes, so
+          // force the library's own ZXing-based decoder instead.
+          useBarCodeDetectorIfSupported: false,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+          ],
+        },
         false
       );
 
