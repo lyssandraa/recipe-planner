@@ -10,9 +10,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// This url is a placeholder only, never actually connected to: both the app
+// (lib/prisma.ts) and the CLI (prisma.config.ts) construct a PrismaLibSql
+// driver adapter directly from DATABASE_URL/TURSO_AUTH_TOKEN, which is the
+// real connection. The schema parser still requires this field to look like
+// a valid sqlite url, hence the hardcoded file: literal.
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./dev.db"
 }
 
 enum MealType {
