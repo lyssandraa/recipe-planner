@@ -26,8 +26,15 @@ export type OffLookupResult =
       // had to fall back to an explicitly non-English-named field like
       // ingredients_text_fr. Null means "assumed English", not "confirmed".
       ingredientsLanguage: string | null;
-      countryOfOrigin: string | null;
-      countryTags: string[];
+      // Where the ingredients themselves are from (origins/origins_tags).
+      // Not where it's sold, OFF tracks those separately and conflating
+      // them is exactly the bug this field split fixes.
+      ingredientOrigin: string | null;
+      // Where it was made or packed (manufacturing_places/manufacturing_places_tags).
+      manufacturingPlace: string | null;
+      // Where it's sold (countries_tags). Often the only field OFF actually
+      // has filled in, hence it used to get mistaken for origin.
+      soldIn: string | null;
       labelsTags: string[];
       nutritionPer100g: Record<string, unknown> | null;
       imageUrl: string | null;
@@ -41,6 +48,45 @@ function asNonEmptyString(value: unknown): string | null {
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+// A real Open Food Facts tag slug, once its "xx:" language prefix is
+// stripped, is always lowercase ascii and hyphens. Contributors sometimes
+// end up with their free-text entry echoed back into the *_tags array
+// verbatim (e.g. origins_tags containing both "en:united-states" and
+// "en:États-Unis" for the same product), which would otherwise show as a
+// second, flagless "country" duplicating the first. Filtering to slug-shaped
+// entries drops those without needing to recognise every language's spelling
+// of the same place.
+function normaliseTags(tags: string[]): string[] {
+  return tags
+    .map((t) => t.replace(/^[a-z]{2}:/, ""))
+    .filter((t) => /^[a-z0-9-]+$/.test(t));
+}
+
+// Reads a "where" field OFF tracks as a tags array plus a free-text
+// fallback (origins/origins_tags, manufacturing_places/manufacturing_places_tags).
+// Tags are preferred and stored as slugs joined by commas so
+// lib/countries.ts can resolve a flag from them later; the free-text field
+// is used only when there are no usable tags at all, e.g. a contributor
+// typed "USA" without picking a tag.
+function pickPlaceField(
+  product: Record<string, unknown>,
+  textKey: string,
+  tagsKey: string
+): string | null {
+  const tags = normaliseTags(asStringArray(product[tagsKey]));
+  if (tags.length > 0) return tags.join(",");
+  return asNonEmptyString(product[textKey]);
+}
+
+// countries_tags only, no free-text fallback: OFF's plain `countries`
+// field is often just the tags rendered back out as text, and this is the
+// field most reliably populated even when origin/manufacturing data isn't,
+// which is exactly why it used to get mistaken for origin.
+function pickSoldIn(product: Record<string, unknown>): string | null {
+  const tags = normaliseTags(asStringArray(product.countries_tags));
+  return tags.length > 0 ? tags.join(",") : null;
 }
 
 // Looks for any product[`${baseKey}_xx`] field (a language-suffixed
@@ -217,8 +263,9 @@ export async function fetchOpenFoodFactsProduct(
     brand: asNonEmptyString(product.brands),
     rawIngredientsText: ingredientsText.value,
     ingredientsLanguage: ingredientsText.language,
-    countryOfOrigin: asNonEmptyString(product.countries),
-    countryTags: asStringArray(product.countries_tags),
+    ingredientOrigin: pickPlaceField(product, "origins", "origins_tags"),
+    manufacturingPlace: pickPlaceField(product, "manufacturing_places", "manufacturing_places_tags"),
+    soldIn: pickSoldIn(product),
     labelsTags: asStringArray(product.labels_tags),
     nutritionPer100g:
       product.nutriments && typeof product.nutriments === "object"

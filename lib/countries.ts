@@ -1,6 +1,6 @@
-// Maps Open Food Facts country tag slugs (from countries_tags, e.g.
-// "en:united-kingdom") to ISO 3166-1 alpha-2 codes, so a flag emoji can be
-// derived from the code rather than guessed from free text. Easy to
+// Maps Open Food Facts country tag slugs (e.g. "united-kingdom", from a
+// "en:united-kingdom" tag) to ISO 3166-1 alpha-2 codes, so a flag emoji can
+// be derived from the code rather than guessed from free text. Easy to
 // extend: add a slug/code pair as new countries show up in scanned
 // products.
 export const COUNTRY_SLUG_TO_ISO: Record<string, string> = {
@@ -43,6 +43,11 @@ export const COUNTRY_SLUG_TO_ISO: Record<string, string> = {
   israel: "IL",
   argentina: "AR",
   chile: "CL",
+  bulgaria: "BG",
+  "czech-republic": "CZ",
+  hungary: "HU",
+  romania: "RO",
+  slovenia: "SI",
 };
 
 const REGIONAL_INDICATOR_OFFSET = 127397;
@@ -58,27 +63,12 @@ export function isoToFlagEmoji(iso: string): string {
     .join("");
 }
 
-// "en:united-kingdom" -> "United Kingdom"
+// "united-kingdom" -> "United Kingdom"
 function slugToName(slug: string): string {
   return slug
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-}
-
-export type CountryTagInfo = {
-  label: string;
-  flag: string | null;
-};
-
-// A single countries_tags entry, e.g. "en:united-kingdom" or "en:france".
-export function getCountryTagInfo(tag: string): CountryTagInfo {
-  const slug = tag.replace(/^[a-z]{2}:/, "");
-  const iso = COUNTRY_SLUG_TO_ISO[slug] ?? null;
-  return {
-    label: slugToName(slug),
-    flag: iso ? isoToFlagEmoji(iso) : null,
-  };
 }
 
 export type CountryDisplay = {
@@ -87,29 +77,47 @@ export type CountryDisplay = {
   otherCount: number;
 };
 
-// countryTags are raw Open Food Facts tags, e.g. ["en:united-kingdom", "en:france"].
-// countryOfOrigin is the human-readable fallback (from a manual entry, or
-// when a source doesn't provide tags), a comma-separated list of names.
-// Returns null when there's genuinely no country data, so the caller can
-// say so plainly instead of just omitting the row.
-export function getCountryDisplay(
-  countryTags: string[] | null,
-  countryOfOrigin: string | null
-): CountryDisplay | null {
-  if (countryTags && countryTags.length > 0) {
-    const first = getCountryTagInfo(countryTags[0]);
-    return { label: first.label, flag: first.flag, otherCount: countryTags.length - 1 };
-  }
+// One entry from a stored origin field: a comma-separated list of either
+// Open Food Facts tag slugs with any "xx:" language prefix stripped (e.g.
+// "united-states,mexico", written that way by lib/openFoodFacts.ts when
+// tags are available) or free text (a manual entry, or OFF's own free-text
+// field when it had no tags for this product, e.g. "USA, Mexico"). Either
+// way, each part is tried against the slug table first (after normalising
+// to slug shape) so a flag still resolves when the part happens to be a
+// known country regardless of which form it arrived in; a part that
+// doesn't match anything recognised is still shown, just without a flag.
+export function resolveOrigin(stored: string | null): CountryDisplay | null {
+  if (!stored || !stored.trim()) return null;
 
-  if (countryOfOrigin && countryOfOrigin.trim()) {
-    const parts = countryOfOrigin
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (parts.length > 0) {
-      return { label: parts[0], flag: null, otherCount: parts.length - 1 };
-    }
-  }
+  const parts = stored
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
 
-  return null;
+  const first = parts[0];
+  const slug = first
+    .toLowerCase()
+    .replace(/^[a-z]{2}:/, "")
+    .replace(/\s+/g, "-");
+  const iso = COUNTRY_SLUG_TO_ISO[slug] ?? null;
+
+  return {
+    label: iso ? slugToName(slug) : first,
+    flag: iso ? isoToFlagEmoji(iso) : null,
+    otherCount: parts.length - 1,
+  };
+}
+
+// For a free-typed manual correction, which is prose the user wrote (may
+// well contain its own commas, e.g. "US pistachios, packed in Germany")
+// rather than a list of country values, so it's never split on commas the
+// way resolveOrigin's stored fields are. Shown exactly as typed, with a
+// flag added only when the whole thing happens to be just a country name.
+export function resolveOverride(text: string | null): { label: string; flag: string | null } | null {
+  if (!text || !text.trim()) return null;
+  const trimmed = text.trim();
+  const slug = trimmed.toLowerCase().replace(/\s+/g, "-");
+  const iso = COUNTRY_SLUG_TO_ISO[slug] ?? null;
+  return { label: trimmed, flag: iso ? isoToFlagEmoji(iso) : null };
 }
