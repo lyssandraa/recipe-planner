@@ -2,19 +2,53 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { MealType, Unit } from "@prisma/client";
+import type {
+  ComponentType,
+  CookMethod,
+  Cuisine,
+  MealType,
+  Mood,
+  Protein,
+  Season,
+  Unit,
+} from "@prisma/client";
+import { IconX } from "@tabler/icons-react";
 import IngredientCombobox, {
   type IngredientOption,
 } from "./ingredient-combobox";
 import {
   createRecipe,
   updateRecipe,
+  type RecipeComponentInput,
   type RecipeFormInput,
 } from "./actions";
 import type { RecipeStep } from "@/lib/instructions";
 import { useBackOrFallback } from "@/lib/useBackOrFallback";
 import { useUnsavedChangesWarning } from "@/lib/useUnsavedChangesWarning";
 import { useToast } from "@/app/components/toast-provider";
+import ChipGroup from "@/app/components/chip-group";
+import {
+  CUISINE_ORDER,
+  CUISINE_LABELS,
+  CUISINE_EMOJI,
+  MOOD_ORDER,
+  MOOD_LABELS,
+  MOOD_EMOJI,
+  PROTEIN_ORDER,
+  PROTEIN_LABELS,
+  PROTEIN_EMOJI,
+  COOK_METHOD_ORDER,
+  COOK_METHOD_LABELS,
+  COOK_METHOD_EMOJI,
+  SEASON_ORDER,
+  SEASON_LABELS,
+  SEASON_EMOJI,
+} from "@/lib/tags";
+import {
+  COMPONENT_TYPE_ORDER,
+  COMPONENT_TYPE_LABELS,
+  COMPONENT_TYPE_EMOJI,
+} from "@/lib/componentTypes";
 
 const MEAL_TYPES: MealType[] = [
   "BREAKFAST",
@@ -25,9 +59,19 @@ const MEAL_TYPES: MealType[] = [
   "BAKING",
   "SIDE",
   "SAUCE_CONDIMENT",
+  "COMPONENT",
   "OTHER",
 ];
 const UNITS: Unit[] = ["g", "kg", "ml", "l", "tsp", "tbsp", "cup", "piece"];
+
+export type ComponentOption = { id: string; title: string; componentType: ComponentType | null };
+
+function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
 
 let rowIdCounter = 0;
 function nextRowId() {
@@ -52,12 +96,20 @@ type StepRow = {
   ingredientIds: string[];
 };
 
+type ComponentLinkRow = {
+  key: string;
+  componentRecipeId: string;
+  title: string;
+  note: string;
+};
+
 type InitialRecipe = {
   id: string;
   title: string;
   description: string | null;
   servings: number | null;
   mealType: MealType;
+  componentType: ComponentType | null;
   totalTimeMins: number | null;
   activeTimeMins: number | null;
   batchFriendly: boolean;
@@ -72,7 +124,23 @@ type InitialRecipe = {
     note: string | null;
     optional: boolean;
   }[];
+  cuisines: Cuisine[];
+  moods: Mood[];
+  proteins: Protein[];
+  methods: CookMethod[];
+  seasons: Season[];
+  components: { componentRecipeId: string; title: string; note: string | null }[];
 };
+
+function toComponentRows(initial?: InitialRecipe["components"]): ComponentLinkRow[] {
+  if (!initial) return [];
+  return initial.map((c) => ({
+    key: nextRowId(),
+    componentRecipeId: c.componentRecipeId,
+    title: c.title,
+    note: c.note ?? "",
+  }));
+}
 
 function toIngredientRows(initial?: InitialRecipe["ingredients"]): IngredientRow[] {
   if (!initial || initial.length === 0) {
@@ -114,9 +182,11 @@ function toStepRows(initial?: RecipeStep[]): StepRow[] {
 
 export default function RecipeForm({
   ingredientOptions,
+  componentOptions,
   initial,
 }: {
   ingredientOptions: IngredientOption[];
+  componentOptions: ComponentOption[];
   initial?: InitialRecipe;
 }) {
   const [options, setOptions] = useState<IngredientOption[]>(ingredientOptions);
@@ -126,6 +196,9 @@ export default function RecipeForm({
     initial?.servings != null ? String(initial.servings) : ""
   );
   const [mealType, setMealType] = useState<MealType>(initial?.mealType ?? "DINNER");
+  const [componentType, setComponentType] = useState<ComponentType | null>(
+    initial?.componentType ?? null
+  );
   const [totalTimeMins, setTotalTimeMins] = useState(
     initial?.totalTimeMins != null ? String(initial.totalTimeMins) : ""
   );
@@ -139,6 +212,15 @@ export default function RecipeForm({
     toIngredientRows(initial?.ingredients)
   );
   const [stepRows, setStepRows] = useState<StepRow[]>(() => toStepRows(initial?.steps));
+  const [cuisines, setCuisines] = useState<Set<Cuisine>>(() => new Set(initial?.cuisines));
+  const [moods, setMoods] = useState<Set<Mood>>(() => new Set(initial?.moods));
+  const [proteins, setProteins] = useState<Set<Protein>>(() => new Set(initial?.proteins));
+  const [methods, setMethods] = useState<Set<CookMethod>>(() => new Set(initial?.methods));
+  const [seasons, setSeasons] = useState<Set<Season>>(() => new Set(initial?.seasons));
+  const [componentRows, setComponentRows] = useState<ComponentLinkRow[]>(() =>
+    toComponentRows(initial?.components)
+  );
+  const [componentToAdd, setComponentToAdd] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -161,6 +243,7 @@ export default function RecipeForm({
     description,
     servings,
     mealType,
+    componentType,
     totalTimeMins,
     activeTimeMins,
     batchFriendly,
@@ -168,6 +251,12 @@ export default function RecipeForm({
     source,
     ingredientRows,
     stepRows,
+    cuisines,
+    moods,
+    proteins,
+    methods,
+    seasons,
+    componentRows,
   ]);
 
   function handleCancel() {
@@ -232,6 +321,26 @@ export default function RecipeForm({
     setStepRows((rows) => rows.filter((row) => row.key !== key));
   }
 
+  function addComponentLink() {
+    if (!componentToAdd) return;
+    const option = componentOptions.find((o) => o.id === componentToAdd);
+    if (!option) return;
+    if (componentRows.some((r) => r.componentRecipeId === option.id)) return;
+    setComponentRows((rows) => [
+      ...rows,
+      { key: nextRowId(), componentRecipeId: option.id, title: option.title, note: "" },
+    ]);
+    setComponentToAdd("");
+  }
+
+  function updateComponentRow(key: string, note: string) {
+    setComponentRows((rows) => rows.map((r) => (r.key === key ? { ...r, note } : r)));
+  }
+
+  function removeComponentRow(key: string) {
+    setComponentRows((rows) => rows.filter((r) => r.key !== key));
+  }
+
   function handleSubmit() {
     setError(null);
 
@@ -260,11 +369,17 @@ export default function RecipeForm({
         return step;
       });
 
+    const componentLinks: RecipeComponentInput[] = componentRows.map((row) => ({
+      componentRecipeId: row.componentRecipeId,
+      note: row.note.trim() || null,
+    }));
+
     const input: RecipeFormInput = {
       title: title.trim(),
       description: description.trim() || null,
       servings: servings.trim() ? Number(servings) : null,
       mealType,
+      componentType: mealType === "COMPONENT" ? componentType : null,
       totalTimeMins: totalTimeMins.trim() ? Number(totalTimeMins) : null,
       activeTimeMins: activeTimeMins.trim() ? Number(activeTimeMins) : null,
       batchFriendly,
@@ -278,6 +393,12 @@ export default function RecipeForm({
         note: row.note.trim() || null,
         optional: row.optional,
       })),
+      cuisines: Array.from(cuisines),
+      moods: Array.from(moods),
+      proteins: Array.from(proteins),
+      methods: Array.from(methods),
+      seasons: Array.from(seasons),
+      components: componentLinks,
     };
 
     startTransition(async () => {
@@ -304,7 +425,7 @@ export default function RecipeForm({
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Title</label>
         <input
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -313,7 +434,7 @@ export default function RecipeForm({
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Description</label>
         <textarea
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -324,7 +445,7 @@ export default function RecipeForm({
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium">Meal type</label>
           <select
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={mealType}
             onChange={(e) => setMealType(e.target.value as MealType)}
           >
@@ -340,12 +461,35 @@ export default function RecipeForm({
           <input
             type="number"
             min={0}
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={servings}
             onChange={(e) => setServings(e.target.value)}
           />
         </div>
       </div>
+
+      {mealType === "COMPONENT" && (
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">Component type</label>
+          <div className="flex flex-wrap gap-2">
+            {COMPONENT_TYPE_ORDER.map((ct) => (
+              <button
+                key={ct}
+                type="button"
+                onClick={() => setComponentType(ct)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                  componentType === ct
+                    ? "bg-green-deep text-white"
+                    : "bg-cream-grey text-cream-grey-text"
+                }`}
+              >
+                <span className="mr-1">{COMPONENT_TYPE_EMOJI[ct]}</span>
+                {COMPONENT_TYPE_LABELS[ct]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
@@ -353,7 +497,7 @@ export default function RecipeForm({
           <input
             type="number"
             min={0}
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={totalTimeMins}
             onChange={(e) => setTotalTimeMins(e.target.value)}
           />
@@ -363,7 +507,7 @@ export default function RecipeForm({
           <input
             type="number"
             min={0}
-            className="rounded-md border border-border-soft px-3 py-2 text-sm"
+            className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
             value={activeTimeMins}
             onChange={(e) => setActiveTimeMins(e.target.value)}
           />
@@ -383,7 +527,7 @@ export default function RecipeForm({
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Leftover note</label>
         <textarea
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           rows={2}
           value={leftoverNote}
           onChange={(e) => setLeftoverNote(e.target.value)}
@@ -393,15 +537,60 @@ export default function RecipeForm({
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium">Source</label>
         <input
-          className="rounded-md border border-border-soft px-3 py-2 text-sm"
+          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
           placeholder="URL or free text"
           value={source}
           onChange={(e) => setSource(e.target.value)}
         />
       </div>
 
+      <p className="-mb-2 text-xs text-ink-soft">
+        Tags are all optional, pick whichever fit.
+      </p>
+
+      <ChipGroup
+        label="Cuisine"
+        options={CUISINE_ORDER}
+        labels={CUISINE_LABELS}
+        emoji={CUISINE_EMOJI}
+        selected={cuisines}
+        onToggle={(v) => setCuisines((s) => toggleInSet(s, v))}
+      />
+      <ChipGroup
+        label="Mood"
+        options={MOOD_ORDER}
+        labels={MOOD_LABELS}
+        emoji={MOOD_EMOJI}
+        selected={moods}
+        onToggle={(v) => setMoods((s) => toggleInSet(s, v))}
+      />
+      <ChipGroup
+        label="Protein"
+        options={PROTEIN_ORDER}
+        labels={PROTEIN_LABELS}
+        emoji={PROTEIN_EMOJI}
+        selected={proteins}
+        onToggle={(v) => setProteins((s) => toggleInSet(s, v))}
+      />
+      <ChipGroup
+        label="Method"
+        options={COOK_METHOD_ORDER}
+        labels={COOK_METHOD_LABELS}
+        emoji={COOK_METHOD_EMOJI}
+        selected={methods}
+        onToggle={(v) => setMethods((s) => toggleInSet(s, v))}
+      />
+      <ChipGroup
+        label="Season"
+        options={SEASON_ORDER}
+        labels={SEASON_LABELS}
+        emoji={SEASON_EMOJI}
+        selected={seasons}
+        onToggle={(v) => setSeasons((s) => toggleInSet(s, v))}
+      />
+
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-sage-darker">Ingredients</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink">Ingredients</h2>
         <div className="flex flex-col gap-3">
           {ingredientRows.map((row) => (
             <div
@@ -443,14 +632,14 @@ export default function RecipeForm({
                   step="any"
                   min={0}
                   placeholder="Quantity"
-                  className="rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                  className="rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                   value={row.quantity}
                   onChange={(e) =>
                     updateIngredientRow(row.key, { quantity: e.target.value })
                   }
                 />
                 <select
-                  className="rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                  className="rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                   value={row.unit}
                   onChange={(e) =>
                     updateIngredientRow(row.key, {
@@ -469,14 +658,14 @@ export default function RecipeForm({
 
               <input
                 placeholder="Note, e.g. finely chopped"
-                className="mt-2 w-full rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                className="mt-2 w-full rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                 value={row.note}
                 onChange={(e) =>
                   updateIngredientRow(row.key, { note: e.target.value })
                 }
               />
 
-              <label className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+              <label className="mt-2 flex items-center gap-2 text-xs text-ink-soft">
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5"
@@ -493,14 +682,73 @@ export default function RecipeForm({
         <button
           type="button"
           onClick={addIngredientRow}
-          className="mt-2 text-sm text-sage-deep"
+          className="mt-2 text-sm text-green-deep"
         >
           + Add ingredient
         </button>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-sage-darker">Steps</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink">Components used</h2>
+        <p className="-mt-1 mb-2 text-xs text-ink-soft">
+          Link a marinade, sauce or other component instead of duplicating its ingredients.
+        </p>
+        {componentRows.length > 0 && (
+          <div className="mb-2 flex flex-col gap-2">
+            {componentRows.map((row) => (
+              <div key={row.key} className="rounded-lg border border-border-soft bg-card p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-ink">{row.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeComponentRow(row.key)}
+                    aria-label="Remove component"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-soft"
+                  >
+                    <IconX size={14} stroke={2} />
+                  </button>
+                </div>
+                <input
+                  placeholder="Note, e.g. marinate the lamb overnight in this"
+                  className="mt-2 w-full rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
+                  value={row.note}
+                  onChange={(e) => updateComponentRow(row.key, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {componentOptions.length > 0 && (
+          <div className="flex gap-2">
+            <select
+              className="flex-1 rounded-[12px] border border-border-soft px-3 py-2 text-sm"
+              value={componentToAdd}
+              onChange={(e) => setComponentToAdd(e.target.value)}
+            >
+              <option value="">Choose a component…</option>
+              {componentOptions
+                .filter((o) => !componentRows.some((r) => r.componentRecipeId === o.id))
+                .filter((o) => o.id !== initial?.id)
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.title}
+                  </option>
+                ))}
+            </select>
+            <button
+              type="button"
+              disabled={!componentToAdd}
+              onClick={addComponentLink}
+              className="shrink-0 rounded-[12px] border border-green-deep px-3 py-2 text-sm font-medium text-green-deep disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-ink">Steps</h2>
         <div className="flex flex-col gap-3">
           {stepRows.map((row, i) => (
             <div
@@ -508,11 +756,11 @@ export default function RecipeForm({
               className="rounded-lg border border-border-soft bg-card p-3"
             >
               <div className="flex items-start gap-2">
-                <span className="mt-2 text-xs font-medium text-text-muted">
+                <span className="mt-2 text-xs font-medium text-ink-soft">
                   {i + 1}.
                 </span>
                 <textarea
-                  className="flex-1 rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                  className="flex-1 rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                   rows={2}
                   value={row.text}
                   onChange={(e) => updateStepRow(row.key, { text: e.target.value })}
@@ -529,7 +777,7 @@ export default function RecipeForm({
                 type="number"
                 min={0}
                 placeholder="Timer (minutes, optional)"
-                className="mt-2 w-40 rounded-md border border-border-soft px-2 py-1.5 text-sm"
+                className="mt-2 w-40 rounded-[12px] border border-border-soft px-2 py-1.5 text-sm"
                 value={row.timerMinutes}
                 onChange={(e) =>
                   updateStepRow(row.key, { timerMinutes: e.target.value })
@@ -538,7 +786,7 @@ export default function RecipeForm({
 
               {ingredientRows.some((r) => r.ingredientId) && (
                 <div className="mt-2">
-                  <p className="mb-1 text-xs text-text-muted">
+                  <p className="mb-1 text-xs text-ink-soft">
                     Uses (shown in cook mode)
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -553,8 +801,8 @@ export default function RecipeForm({
                             onClick={() => toggleStepIngredient(row.key, r.ingredientId!)}
                             className={`rounded-full px-2 py-1 text-xs ${
                               active
-                                ? "bg-sage-deep text-white"
-                                : "border border-border-soft text-text-muted"
+                                ? "bg-green-deep text-white"
+                                : "border border-border-soft text-ink-soft"
                             }`}
                           >
                             {r.ingredientName}
@@ -570,7 +818,7 @@ export default function RecipeForm({
         <button
           type="button"
           onClick={addStepRow}
-          className="mt-2 text-sm text-sage-deep"
+          className="mt-2 text-sm text-green-deep"
         >
           + Add step
         </button>
@@ -583,7 +831,7 @@ export default function RecipeForm({
           type="button"
           disabled={isPending}
           onClick={handleSubmit}
-          className="flex-1 rounded-md bg-sage-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          className="flex-1 rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save recipe"}
         </button>
@@ -591,7 +839,7 @@ export default function RecipeForm({
           type="button"
           disabled={isPending}
           onClick={handleCancel}
-          className="rounded-md border border-border-soft px-4 py-2.5 text-sm font-medium text-sage-darker disabled:opacity-50"
+          className="rounded-[12px] border border-border-soft px-4 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
         >
           Cancel
         </button>

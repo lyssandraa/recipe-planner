@@ -1,4 +1,15 @@
-import { PrismaClient, Unit, MealType, IngredientCategory } from "@prisma/client";
+import {
+  PrismaClient,
+  Unit,
+  MealType,
+  IngredientCategory,
+  ComponentType,
+  Cuisine,
+  Mood,
+  Protein,
+  CookMethod,
+  Season,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -52,6 +63,11 @@ const ingredients: SeedIngredient[] = [
   { name: "Lentils", isStaple: false, category: "DRY_GOODS", isLegume: true, isHighFibre: true },
   { name: "Salmon", plural: "Salmon Fillets", isStaple: false, category: "MEAT_FISH", isOilyFish: true },
   { name: "Wholemeal Bread", isStaple: false, category: "DRY_GOODS", isWholegrain: true, isHighFibre: true },
+  { name: "Lamb Shoulder", isStaple: false, category: "MEAT_FISH" },
+  { name: "Ground Cumin", isStaple: false, category: "SPICES" },
+  { name: "Paprika", isStaple: false, category: "SPICES" },
+  { name: "Sumac", isStaple: false, category: "SPICES" },
+  { name: "Dried Oregano", isStaple: false, category: "SPICES" },
 ];
 
 // "Satisfies" relations: having the ingredient on the left means the
@@ -130,6 +146,11 @@ async function main() {
           { ingredientId: id("Lemon"), quantity: 1, unit: Unit.piece, note: "juiced", optional: true },
         ],
       },
+      cuisines: { create: [{ value: Cuisine.BRITISH }] },
+      moods: { create: [{ value: Mood.COMFORTING }, { value: Mood.QUICK_SIMPLE }] },
+      proteins: { create: [{ value: Protein.CHICKEN }] },
+      methods: { create: [{ value: CookMethod.FRIED }, { value: CookMethod.ONE_PAN }] },
+      seasons: { create: [{ value: Season.ALL_YEAR }] },
     },
   });
 
@@ -162,6 +183,11 @@ async function main() {
           { ingredientId: id("Parmesan Cheese"), quantity: 30, unit: Unit.g, note: "grated", optional: true },
         ],
       },
+      cuisines: { create: [{ value: Cuisine.ITALIAN }] },
+      moods: { create: [{ value: Mood.QUICK_SIMPLE }, { value: Mood.COMFORTING }] },
+      proteins: { create: [{ value: Protein.VEGETARIAN }] },
+      methods: { create: [{ value: CookMethod.ONE_PAN }] },
+      seasons: { create: [{ value: Season.ALL_YEAR }] },
     },
   });
 
@@ -197,6 +223,145 @@ async function main() {
           { ingredientId: id("Cheddar Cheese"), quantity: 80, unit: Unit.g, note: "grated", optional: true },
           { ingredientId: id("Salt") },
           { ingredientId: id("Black Pepper") },
+        ],
+      },
+      cuisines: { create: [{ value: Cuisine.AMERICAN }] },
+      moods: { create: [{ value: Mood.COMFORTING }, { value: Mood.HEARTY }, { value: Mood.WARMING }] },
+      proteins: { create: [{ value: Protein.CHICKEN }] },
+      methods: { create: [{ value: CookMethod.BRAISED }] },
+      seasons: { create: [{ value: Season.AUTUMN }, { value: Season.WINTER }] },
+    },
+  });
+
+  const marinade = await prisma.recipe.create({
+    data: {
+      title: "Yoghurt and Spice Marinade",
+      description: "A thick, tangy marinade that tenderises as it flavours.",
+      instructions: JSON.stringify([
+        { text: "Mix the yoghurt, garlic, cumin, paprika, lemon juice, olive oil and salt in a bowl until smooth." },
+        { text: "Use straight away, or keep covered in the fridge for up to 2 days." },
+      ]),
+      totalTimeMins: 10,
+      activeTimeMins: 10,
+      mealType: MealType.COMPONENT,
+      componentType: ComponentType.MARINADE,
+      source: "Family recipe",
+      ingredients: {
+        create: [
+          { ingredientId: id("Plain Yoghurt"), quantity: 200, unit: Unit.g },
+          { ingredientId: id("Garlic"), quantity: 3, unit: Unit.piece, note: "minced" },
+          { ingredientId: id("Ground Cumin"), quantity: 1, unit: Unit.tsp },
+          { ingredientId: id("Paprika"), quantity: 1, unit: Unit.tsp },
+          { ingredientId: id("Lemon"), quantity: 1, unit: Unit.piece, note: "juiced" },
+          { ingredientId: id("Olive Oil"), quantity: 2, unit: Unit.tbsp },
+          { ingredientId: id("Salt"), quantity: 1, unit: Unit.tsp },
+        ],
+      },
+      cuisines: { create: [{ value: Cuisine.MIDDLE_EASTERN }] },
+      methods: { create: [{ value: CookMethod.NO_COOK }] },
+      seasons: { create: [{ value: Season.ALL_YEAR }] },
+    },
+  });
+
+  const relish = await prisma.recipe.create({
+    data: {
+      title: "Sumac Onion Relish",
+      description: "Sharp, quick-pickled red onion, good scattered over rich braised meat.",
+      instructions: JSON.stringify([
+        { text: "Toss the sliced red onion with the sumac, lemon juice and salt." },
+        { text: "Leave to sit for at least 15 minutes before serving.", timerSeconds: 900 },
+      ]),
+      totalTimeMins: 15,
+      activeTimeMins: 10,
+      mealType: MealType.COMPONENT,
+      componentType: ComponentType.PICKLE,
+      source: "Family recipe",
+      ingredients: {
+        create: [
+          { ingredientId: id("Red Onion"), quantity: 2, unit: Unit.piece, note: "very thinly sliced" },
+          { ingredientId: id("Sumac"), quantity: 1, unit: Unit.tbsp },
+          { ingredientId: id("Lemon"), quantity: 1, unit: Unit.piece, note: "juiced" },
+          { ingredientId: id("Salt"), quantity: 1, unit: Unit.tsp },
+        ],
+      },
+      cuisines: { create: [{ value: Cuisine.MIDDLE_EASTERN }] },
+      methods: { create: [{ value: CookMethod.NO_COOK }] },
+      seasons: { create: [{ value: Season.ALL_YEAR }] },
+    },
+  });
+
+  await prisma.recipe.create({
+    data: {
+      title: "Lemon and Oregano Marinade",
+      description: "A bright, garlicky marinade for grilling.",
+      instructions: JSON.stringify([
+        { text: "Whisk the lemon juice, olive oil, garlic, oregano, salt and pepper together." },
+      ]),
+      totalTimeMins: 10,
+      activeTimeMins: 10,
+      mealType: MealType.COMPONENT,
+      componentType: ComponentType.MARINADE,
+      source: "Family recipe",
+      ingredients: {
+        create: [
+          { ingredientId: id("Lemon"), quantity: 2, unit: Unit.piece, note: "juiced" },
+          { ingredientId: id("Olive Oil"), quantity: 4, unit: Unit.tbsp },
+          { ingredientId: id("Garlic"), quantity: 2, unit: Unit.piece, note: "minced" },
+          { ingredientId: id("Dried Oregano"), quantity: 1, unit: Unit.tbsp },
+          { ingredientId: id("Salt"), quantity: 1, unit: Unit.tsp },
+          { ingredientId: id("Black Pepper"), note: "to taste", optional: true },
+        ],
+      },
+      cuisines: { create: [{ value: Cuisine.GREEK }] },
+      methods: { create: [{ value: CookMethod.NO_COOK }] },
+      seasons: { create: [{ value: Season.SPRING }, { value: Season.SUMMER }] },
+    },
+  });
+
+  await prisma.recipe.create({
+    data: {
+      title: "Slow-Braised Lamb Shoulder",
+      description:
+        "Lamb shoulder marinated overnight then braised until falling apart. Mostly hands-off oven time.",
+      servings: 5,
+      instructions: JSON.stringify([
+        { text: "Marinate the lamb shoulder overnight in the yoghurt and spice marinade, covered, in the fridge.", timerSeconds: 43200 },
+        { text: "Preheat the oven to 150C (300F)." },
+        { text: "Scrape most of the marinade off the lamb and season with salt and pepper." },
+        { text: "Heat the olive oil in an ovenproof pan and brown the lamb on all sides.", timerSeconds: 480 },
+        { text: "Add the onion around the lamb, cover, and braise in the oven until the meat falls apart.", timerSeconds: 10800 },
+        { text: "Rest for 10 minutes, then shred and serve scattered with the sumac onion relish.", timerSeconds: 600 },
+      ]),
+      totalTimeMins: 210,
+      activeTimeMins: 30,
+      batchFriendly: true,
+      leftoverNote: "Shredded lamb reheats well in a low oven with a splash of water or stock.",
+      mealType: MealType.DINNER,
+      source: "Family recipe",
+      ingredients: {
+        create: [
+          { ingredientId: id("Lamb Shoulder"), quantity: 1200, unit: Unit.g },
+          { ingredientId: id("Onion"), quantity: 1, unit: Unit.piece, note: "sliced" },
+          { ingredientId: id("Olive Oil"), quantity: 1, unit: Unit.tbsp },
+          { ingredientId: id("Salt"), quantity: 1, unit: Unit.tsp },
+          { ingredientId: id("Black Pepper"), note: "to taste", optional: true },
+        ],
+      },
+      cuisines: { create: [{ value: Cuisine.MIDDLE_EASTERN }] },
+      moods: { create: [{ value: Mood.COMFORTING }, { value: Mood.HEARTY }, { value: Mood.WARMING }] },
+      proteins: { create: [{ value: Protein.LAMB }] },
+      methods: { create: [{ value: CookMethod.BRAISED }, { value: CookMethod.SLOW_COOKER }] },
+      seasons: { create: [{ value: Season.AUTUMN }, { value: Season.WINTER }] },
+      components: {
+        create: [
+          {
+            componentRecipeId: marinade.id,
+            note: "Marinate the lamb overnight in this, then scrape off the excess before browning.",
+          },
+          {
+            componentRecipeId: relish.id,
+            note: "Serve scattered over the shredded lamb.",
+          },
         ],
       },
     },

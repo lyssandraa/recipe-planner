@@ -4,9 +4,14 @@ import PageHeader from "@/app/components/page-header";
 import RecipeForm from "../recipe-form";
 
 export default async function NewRecipePage() {
-  const ingredients = await prisma.ingredient.findMany({
-    orderBy: { name: "asc" },
-  });
+  const [ingredients, components] = await Promise.all([
+    prisma.ingredient.findMany({ orderBy: { name: "asc" } }),
+    prisma.recipe.findMany({
+      where: { mealType: "COMPONENT" },
+      orderBy: { title: "asc" },
+      select: { id: true, title: true, componentType: true },
+    }),
+  ]);
 
   return (
     <div>
@@ -16,7 +21,7 @@ export default async function NewRecipePage() {
         backFallbackHref="/recipes"
       />
       <div className="p-4">
-        <RecipeForm ingredientOptions={ingredients} />
+        <RecipeForm ingredientOptions={ingredients} componentOptions={components} />
       </div>
     </div>
   );

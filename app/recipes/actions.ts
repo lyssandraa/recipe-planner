@@ -1,7 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { IngredientCategory, MealType, Unit } from "@prisma/client";
+import type {
+  ComponentType,
+  Cuisine,
+  CookMethod,
+  IngredientCategory,
+  MealType,
+  Mood,
+  Protein,
+  Season,
+  Unit,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { serializeInstructions, type RecipeStep } from "@/lib/instructions";
 import { guessCategory } from "@/lib/guessCategory";
@@ -14,11 +24,17 @@ export type RecipeIngredientInput = {
   optional: boolean;
 };
 
+export type RecipeComponentInput = {
+  componentRecipeId: string;
+  note: string | null;
+};
+
 export type RecipeFormInput = {
   title: string;
   description: string | null;
   servings: number | null;
   mealType: MealType;
+  componentType: ComponentType | null;
   totalTimeMins: number | null;
   activeTimeMins: number | null;
   batchFriendly: boolean;
@@ -26,6 +42,12 @@ export type RecipeFormInput = {
   source: string | null;
   steps: RecipeStep[];
   ingredients: RecipeIngredientInput[];
+  cuisines: Cuisine[];
+  moods: Mood[];
+  proteins: Protein[];
+  methods: CookMethod[];
+  seasons: Season[];
+  components: RecipeComponentInput[];
 };
 
 export async function createIngredient(name: string, category?: IngredientCategory) {
@@ -38,6 +60,24 @@ export async function createIngredient(name: string, category?: IngredientCatego
   return ingredient;
 }
 
+// Nested-create blocks shared by createRecipe and updateRecipe for the tag
+// dimensions and component links, so the two don't drift out of sync.
+function tagAndComponentCreateData(input: RecipeFormInput) {
+  return {
+    cuisines: { create: input.cuisines.map((value) => ({ value })) },
+    moods: { create: input.moods.map((value) => ({ value })) },
+    proteins: { create: input.proteins.map((value) => ({ value })) },
+    methods: { create: input.methods.map((value) => ({ value })) },
+    seasons: { create: input.seasons.map((value) => ({ value })) },
+    components: {
+      create: input.components.map((c) => ({
+        componentRecipeId: c.componentRecipeId,
+        note: c.note,
+      })),
+    },
+  };
+}
+
 export async function createRecipe(input: RecipeFormInput) {
   const recipe = await prisma.recipe.create({
     data: {
@@ -45,6 +85,7 @@ export async function createRecipe(input: RecipeFormInput) {
       description: input.description,
       servings: input.servings,
       mealType: input.mealType,
+      componentType: input.mealType === "COMPONENT" ? input.componentType : null,
       totalTimeMins: input.totalTimeMins,
       activeTimeMins: input.activeTimeMins,
       batchFriendly: input.batchFriendly,
@@ -60,6 +101,7 @@ export async function createRecipe(input: RecipeFormInput) {
           optional: i.optional,
         })),
       },
+      ...tagAndComponentCreateData(input),
     },
   });
 
@@ -72,6 +114,12 @@ export async function createRecipe(input: RecipeFormInput) {
 export async function updateRecipe(id: string, input: RecipeFormInput) {
   await prisma.$transaction([
     prisma.recipeIngredient.deleteMany({ where: { recipeId: id } }),
+    prisma.recipeCuisine.deleteMany({ where: { recipeId: id } }),
+    prisma.recipeMood.deleteMany({ where: { recipeId: id } }),
+    prisma.recipeProtein.deleteMany({ where: { recipeId: id } }),
+    prisma.recipeCookMethod.deleteMany({ where: { recipeId: id } }),
+    prisma.recipeSeason.deleteMany({ where: { recipeId: id } }),
+    prisma.recipeComponent.deleteMany({ where: { parentRecipeId: id } }),
     prisma.recipe.update({
       where: { id },
       data: {
@@ -79,6 +127,7 @@ export async function updateRecipe(id: string, input: RecipeFormInput) {
         description: input.description,
         servings: input.servings,
         mealType: input.mealType,
+        componentType: input.mealType === "COMPONENT" ? input.componentType : null,
         totalTimeMins: input.totalTimeMins,
         activeTimeMins: input.activeTimeMins,
         batchFriendly: input.batchFriendly,
@@ -94,6 +143,7 @@ export async function updateRecipe(id: string, input: RecipeFormInput) {
             optional: i.optional,
           })),
         },
+        ...tagAndComponentCreateData(input),
       },
     }),
   ]);

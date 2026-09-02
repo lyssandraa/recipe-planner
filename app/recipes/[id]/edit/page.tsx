@@ -11,12 +11,25 @@ export default async function EditRecipePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [recipe, ingredients] = await Promise.all([
+  const [recipe, ingredients, components] = await Promise.all([
     prisma.recipe.findUnique({
       where: { id },
-      include: { ingredients: { include: { ingredient: true } } },
+      include: {
+        ingredients: { include: { ingredient: true } },
+        cuisines: true,
+        moods: true,
+        proteins: true,
+        methods: true,
+        seasons: true,
+        components: { include: { component: { select: { title: true } } } },
+      },
     }),
     prisma.ingredient.findMany({ orderBy: { name: "asc" } }),
+    prisma.recipe.findMany({
+      where: { mealType: "COMPONENT" },
+      orderBy: { title: "asc" },
+      select: { id: true, title: true, componentType: true },
+    }),
   ]);
   if (!recipe) notFound();
 
@@ -30,12 +43,14 @@ export default async function EditRecipePage({
       <div className="p-4">
         <RecipeForm
           ingredientOptions={ingredients}
+          componentOptions={components}
           initial={{
             id: recipe.id,
             title: recipe.title,
             description: recipe.description,
             servings: recipe.servings,
             mealType: recipe.mealType,
+            componentType: recipe.componentType,
             totalTimeMins: recipe.totalTimeMins,
             activeTimeMins: recipe.activeTimeMins,
             batchFriendly: recipe.batchFriendly,
@@ -49,6 +64,16 @@ export default async function EditRecipePage({
               unit: ri.unit,
               note: ri.note,
               optional: ri.optional,
+            })),
+            cuisines: recipe.cuisines.map((c) => c.value),
+            moods: recipe.moods.map((m) => m.value),
+            proteins: recipe.proteins.map((p) => p.value),
+            methods: recipe.methods.map((m) => m.value),
+            seasons: recipe.seasons.map((s) => s.value),
+            components: recipe.components.map((c) => ({
+              componentRecipeId: c.componentRecipeId,
+              title: c.component.title,
+              note: c.note,
             })),
           }}
         />

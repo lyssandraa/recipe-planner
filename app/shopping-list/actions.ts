@@ -20,6 +20,14 @@ export type ShoppingListItemData = {
   category: IngredientCategory | null;
 };
 
+// Appended past the current highest sortOrder so a newly added row lands
+// at the end of its category group, not the top. Shared by every create
+// path (manual add, recipe sync, low-stock promote).
+async function nextSortOrder(): Promise<number> {
+  const highest = await prisma.shoppingListItem.aggregate({ _max: { sortOrder: true } });
+  return (highest._max.sortOrder ?? 0) + 1;
+}
+
 export type MightNeedSoonItem = {
   ingredientId: string;
   name: string;
@@ -27,7 +35,7 @@ export type MightNeedSoonItem = {
 
 export async function getShoppingListItems(): Promise<ShoppingListItemData[]> {
   const rows = await prisma.shoppingListItem.findMany({
-    orderBy: [{ checked: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ checked: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     include: { ingredient: { select: { category: true } } },
   });
   return rows.map((r) => ({
@@ -71,7 +79,7 @@ export async function promoteLowStockItem(ingredientId: string): Promise<Shoppin
   await prisma.shoppingListItem.upsert({
     where: { ingredientId_origin: { ingredientId, origin: "LOW_STOCK" } },
     update: {},
-    create: { name: ingredient.name, origin: "LOW_STOCK", ingredientId },
+    create: { name: ingredient.name, origin: "LOW_STOCK", ingredientId, sortOrder: await nextSortOrder() },
   });
   revalidatePath("/shopping-list");
   return getShoppingListItems();
@@ -86,34 +94,63 @@ export async function promoteLowStockItem(ingredientId: string): Promise<Shoppin
 // promoting a "Might need soon" item, this function doesn't touch them at
 // all, it would otherwise have no way to tell "auto-added because OUT" and
 // "promoted on purpose while still LOW" apart.
-export async function syncShoppingList(
-  selectedRecipeIds: string[]
-): Promise<ShoppingListItemData[]> {
+// Shared by syncShoppingList and the planner's "send missing to shopping
+// list": resolves a set of recipe ids into buildShoppingList's input shape,
+// each contributing its own ingredients plus, separately, the ingredients
+// of every component it links to (a marinade, a sauce...) under that
+// component's own title, so pulling in a braise also shops for its
+// marinade without duplicating it into the braise's own ingredient list.
+async function mergeMissingIngredients(recipeIds: string[]) {
   const { wellStocked, lowOrOut } = await getPantryStockSets();
 
   const recipes =
-    selectedRecipeIds.length > 0
+    recipeIds.length > 0
       ? await prisma.recipe.findMany({
-          where: { id: { in: selectedRecipeIds } },
-          include: { ingredients: { include: { ingredient: true } } },
+          where: { id: { in: recipeIds } },
+          include: {
+            ingredients: { include: { ingredient: true } },
+            components: {
+              include: {
+                component: { include: { ingredients: { include: { ingredient: true } } } },
+              },
+            },
+          },
         })
       : [];
 
-  const forMerge = recipes.map((r) => ({
-    title: r.title,
-    ingredients: r.ingredients.map((ri) => ({
-      ingredientId: ri.ingredientId,
-      name: ri.ingredient.name,
-      isStaple: ri.ingredient.isStaple,
-      optional: ri.optional,
-      quantity: ri.quantity,
-      unit: ri.unit,
-      note: ri.note,
-    })),
-  }));
+  function toMergeInput(title: string, ingredients: (typeof recipes)[number]["ingredients"]) {
+    return {
+      title,
+      ingredients: ingredients.map((ri) => ({
+        ingredientId: ri.ingredientId,
+        name: ri.ingredient.name,
+        isStaple: ri.ingredient.isStaple,
+        optional: ri.optional,
+        quantity: ri.quantity,
+        unit: ri.unit,
+        note: ri.note,
+      })),
+    };
+  }
 
-  const merged = buildShoppingList(forMerge, wellStocked, lowOrOut);
+  const forMerge = recipes.flatMap((r) => [
+    toMergeInput(r.title, r.ingredients),
+    ...r.components.map((link) => toMergeInput(link.component.title, link.component.ingredients)),
+  ]);
+
+  return buildShoppingList(forMerge, wellStocked, lowOrOut);
+}
+
+export async function syncShoppingList(
+  selectedRecipeIds: string[]
+): Promise<ShoppingListItemData[]> {
+  const merged = await mergeMissingIngredients(selectedRecipeIds);
   const mergedIds = new Set(merged.map((m) => m.ingredientId));
+
+  // A single base value shared across this sync's new rows, incremented
+  // locally rather than re-queried per row, so a sync that adds several
+  // ingredients at once doesn't tie them all at the same sortOrder.
+  let nextNewSortOrder = await nextSortOrder();
 
   for (const m of merged) {
     const quantityText =
@@ -126,6 +163,7 @@ export async function syncShoppingList(
         quantityText,
         origin: "RECIPE",
         ingredientId: m.ingredientId,
+        sortOrder: nextNewSortOrder++,
       },
     });
   }
@@ -155,11 +193,23 @@ export async function addManualItem(name: string, quantityText: string | null) {
       name: trimmed,
       quantityText: quantityText?.trim() || null,
       origin: "MANUAL",
+      sortOrder: await nextSortOrder(),
     },
   });
 
   revalidatePath("/shopping-list");
   return getShoppingListItems();
+}
+
+// Persists a new manual order for a category group of to-buy items as
+// sequential integers, mirroring the pantry's reorderIngredients.
+export async function reorderShoppingItems(orderedIds: string[]) {
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.shoppingListItem.update({ where: { id }, data: { sortOrder: index } })
+    )
+  );
+  revalidatePath("/shopping-list");
 }
 
 // Setting a value overrides the display quantity without touching the
@@ -182,4 +232,39 @@ export async function clearTickedItems() {
   await prisma.shoppingListItem.deleteMany({ where: { checked: true } });
   revalidatePath("/shopping-list");
   return getShoppingListItems();
+}
+
+// Used by the planner's "send this week's missing ingredients" action.
+// Deliberately additive, unlike syncShoppingList: it only ever upserts,
+// never deletes a RECIPE row for a recipe that isn't in this set, since
+// that set here is "this week's dinners", not the shopping list's own
+// independent recipe selection, wiping the latter would be a surprising
+// side effect of planning a week.
+export async function addRecipesToShoppingList(recipeIds: string[]): Promise<number> {
+  const merged = await mergeMissingIngredients(recipeIds);
+  let nextNewSortOrder = await nextSortOrder();
+  let added = 0;
+
+  for (const m of merged) {
+    const quantityText =
+      m.summedQuantity != null ? formatQuantityUnit(m.summedQuantity, m.unit) : null;
+    const existing = await prisma.shoppingListItem.findUnique({
+      where: { ingredientId_origin: { ingredientId: m.ingredientId, origin: "RECIPE" } },
+    });
+    await prisma.shoppingListItem.upsert({
+      where: { ingredientId_origin: { ingredientId: m.ingredientId, origin: "RECIPE" } },
+      update: { name: m.name, quantityText },
+      create: {
+        name: m.name,
+        quantityText,
+        origin: "RECIPE",
+        ingredientId: m.ingredientId,
+        sortOrder: nextNewSortOrder++,
+      },
+    });
+    if (!existing) added++;
+  }
+
+  revalidatePath("/shopping-list");
+  return added;
 }
