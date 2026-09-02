@@ -1,6 +1,11 @@
 // Prisma schema for the recipe planner.
 // Single-user app, SQLite file database, no auth.
 
+// The client is constructed with a libSQL driver adapter (lib/prisma.ts),
+// so the exact same schema and generated client work against a local
+// SQLite file in development and a remote Turso database in production,
+// no provider switch needed. Driver adapters are stable as of this Prisma
+// version, no previewFeatures flag required.
 generator client {
   provider = "prisma-client-js"
 }
@@ -19,7 +24,87 @@ enum MealType {
   BAKING
   SIDE
   SAUCE_CONDIMENT
+  // Not a meal on its own: a marinade, spice mix, dressing, sauce, pickle
+  // or stock meant to be used inside another recipe. See componentType on
+  // Recipe and the RecipeComponent self-relation. Excluded from the recipe
+  // list's normal browsing so these don't clutter dinner-picking, and
+  // reachable only via an explicit filter or its own dashboard tile.
+  COMPONENT
   OTHER
+}
+
+// What kind of component a COMPONENT-mealType recipe is. Only meaningful
+// when mealType is COMPONENT.
+enum ComponentType {
+  MARINADE
+  SPICE_MIX
+  DRESSING
+  SAUCE
+  PICKLE
+  STOCK
+  OTHER
+}
+
+// Independent tag dimensions, each its own many-to-many via a join model
+// below (RecipeCuisine etc.) since SQLite has no native enum-array column.
+// A recipe can carry zero, one, or several values per dimension.
+enum Cuisine {
+  BRITISH
+  ITALIAN
+  FRENCH
+  GREEK
+  MIDDLE_EASTERN
+  NORTH_AFRICAN
+  INDIAN
+  CHINESE
+  THAI
+  JAPANESE
+  MEXICAN
+  SPANISH
+  AMERICAN
+  OTHER
+}
+
+enum Mood {
+  COMFORTING
+  FRESH_LIGHT
+  HEARTY
+  SPICY
+  WARMING
+  COOLING
+  INDULGENT
+  QUICK_SIMPLE
+}
+
+enum Protein {
+  LAMB
+  CHICKEN
+  BEEF
+  FISH
+  SEAFOOD
+  EGGS
+  VEGETARIAN
+  VEGAN
+}
+
+enum CookMethod {
+  BRAISED
+  ROASTED
+  GRILLED
+  FRIED
+  ONE_PAN
+  NO_COOK
+  SLOW_COOKER
+  PRESSURE_COOKER
+  BAKED
+}
+
+enum Season {
+  SPRING
+  SUMMER
+  AUTUMN
+  WINTER
+  ALL_YEAR
 }
 
 enum StockLevel {
@@ -65,6 +150,12 @@ enum ClaimType {
   CERTIFIED
   REGULATED
   UNREGULATED
+  // Didn't match anything in the static table (lib/claims.ts) when added,
+  // so no explanation is on file yet. Distinct from UNREGULATED, which
+  // means we know it's a marketing term with no legal backing, this means
+  // we simply don't know what it means yet. See ProductClaim.explanation
+  // for the user's own optional note.
+  UNRECOGNISED
 }
 
 // Canonical ingredient. Everything else (recipes, pantry, synonyms) points here.
@@ -77,6 +168,10 @@ model Ingredient {
   // User-written override. When set, takes priority over the static lookup
   // in lib/storageAdvice.ts.
   storageAdvice String?
+  // Manual pantry ordering within a category group (lower first), set via
+  // the up/down reorder controls. Ties (including the default) fall back
+  // to alphabetical, so an unordered category still reads sensibly.
+  sortOrder     Int                @default(0)
 
   // Descriptive-only tags for the dashboard's nutrition-ish nudges. No
   // scores, no targets, just facts to mention.
@@ -129,6 +224,9 @@ model Recipe {
   batchFriendly  Boolean  @default(false)
   leftoverNote   String?
   mealType       MealType @default(DINNER)
+  // Only meaningful when mealType is COMPONENT: what kind of component this
+  // is (marinade, spice mix, dressing, sauce, pickle, stock).
+  componentType  ComponentType?
   // URL the recipe was imported from, or free text ("Mum's recipe book").
   source         String?
   // Set from the JSON-LD `image` field on import. Manual recipes leave this
@@ -139,6 +237,96 @@ model Recipe {
   ingredients     RecipeIngredient[]
   mealPlanEntries MealPlanEntry[]
   cookLogs        CookLog[]
+
+  cuisines RecipeCuisine[]
+  moods    RecipeMood[]
+  proteins RecipeProtein[]
+  methods  RecipeCookMethod[]
+  seasons  RecipeSeason[]
+
+  // Other recipes this one uses as a component, e.g. a braise linking to
+  // its marinade, with a note on how it's used. "components" is what this
+  // recipe uses; "usedIn" is which other recipes use this one (relevant
+  // when this recipe is itself a COMPONENT, e.g. showing "used in 2
+  // recipes" on a marinade's own page).
+  components RecipeComponent[] @relation("RecipeUsesComponents")
+  usedIn     RecipeComponent[] @relation("ComponentUsedInRecipes")
+}
+
+// One tag value in the Cuisine dimension for a recipe. A plain join row
+// (no own id needed, the pair is the identity) rather than a JSON array
+// column, so it stays queryable ("recipes tagged Italian") the same way
+// RecipeIngredient already is for ingredients.
+model RecipeCuisine {
+  recipeId String
+  value    Cuisine
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, value])
+  @@index([value])
+}
+
+model RecipeMood {
+  recipeId String
+  value    Mood
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, value])
+  @@index([value])
+}
+
+model RecipeProtein {
+  recipeId String
+  value    Protein
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, value])
+  @@index([value])
+}
+
+// Named RecipeCookMethod (not RecipeMethod) to keep clear of the unrelated
+// generic word "method"; the enum itself is CookMethod for the same reason.
+model RecipeCookMethod {
+  recipeId String
+  value    CookMethod
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, value])
+  @@index([value])
+}
+
+model RecipeSeason {
+  recipeId String
+  value    Season
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, value])
+  @@index([value])
+}
+
+// Links a recipe to another recipe it uses as a component, e.g. a braise
+// that marinates in a separately-catalogued marinade rather than
+// duplicating that marinade's ingredients inline. Self-relation on Recipe,
+// explicit join model (not an implicit many-to-many) since it carries a
+// note.
+model RecipeComponent {
+  id                String  @id @default(cuid())
+  parentRecipeId    String
+  componentRecipeId String
+  // e.g. "marinate the lamb overnight in this". Shown on the parent
+  // recipe's components card.
+  note              String?
+
+  parent    Recipe @relation("RecipeUsesComponents", fields: [parentRecipeId], references: [id], onDelete: Cascade)
+  component Recipe @relation("ComponentUsedInRecipes", fields: [componentRecipeId], references: [id], onDelete: Cascade)
+
+  @@unique([parentRecipeId, componentRecipeId])
+  @@index([componentRecipeId])
 }
 
 // One entry per time a recipe gets cooked. No UI beyond a single "Cooked it"
@@ -200,11 +388,24 @@ model Product {
   // Set when the ingredient text we stored isn't in English, so the UI can
   // explain why matching against the canonical catalog is likely to fail.
   ingredientsLanguage String?
-  countryOfOrigin     String?
-  // Raw countries_tags from the source, e.g. ["en:united-kingdom", "en:france"],
-  // kept alongside countryOfOrigin so the flag emoji can be derived from the
-  // ISO code rather than parsed back out of a human-readable string.
-  countryTags         Json?
+  // Where the ingredients themselves come from, from Open Food Facts'
+  // origins / origins_tags. Distinct from manufacturingPlace (where it was
+  // made or packed) and soldIn (where it's stocked), which OFF tracks
+  // separately and this app used to conflate into one misleading field.
+  // Stored as tag slugs joined by commas when tags are available (e.g.
+  // "united-states,mexico"), falling back to the free-text field otherwise,
+  // so lib/countries.ts can resolve a flag either way.
+  ingredientOrigin    String?
+  // Where it was made or packed, from manufacturing_places / manufacturing_places_tags.
+  manufacturingPlace  String?
+  // Where it's sold, from countries_tags. This is what the old
+  // countryOfOrigin field actually held, hence the rename, "sold in" is not
+  // "from".
+  soldIn              String?
+  // User-entered correction, free text, shown and preserved in place of the
+  // fields above when set (including across future rescans) since the API
+  // data is sometimes wrong or missing.
+  originOverride      String?
   // Raw nutriments blob as returned by the source, e.g. { "energy-kcal": 250, "fat": 12.3, ... }
   nutritionPer100g    Json?
   imageUrl            String?
@@ -224,11 +425,14 @@ model Product {
 // static lookup in lib/claims.ts at scan time, or added by hand when the
 // text isn't in Open Food Facts' data at all.
 model ProductClaim {
-  id          String    @id @default(cuid())
-  productId   String
-  claimText   String
-  claimType   ClaimType
-  explanation String
+  id        String    @id @default(cuid())
+  productId String
+  claimText String
+  claimType ClaimType
+  // Null for an UNRECOGNISED claim the user hasn't annotated yet, since a
+  // note is optional there. Always set for a matched claim (copied from
+  // lib/claims.ts at the moment it's added).
+  explanation String?
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -311,6 +515,10 @@ model ShoppingListItem {
   checked              Boolean            @default(false)
   ingredientId         String?
   createdAt            DateTime           @default(now())
+  // Manual ordering within a category group (lower first), set via the
+  // up/down reorder controls. New rows are appended past the current
+  // highest value so they land at the end of the list, not the top.
+  sortOrder            Int                @default(0)
 
   ingredient Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
 
@@ -323,8 +531,14 @@ model MealPlan {
   id        String   @id @default(cuid())
   startDate DateTime
   createdAt DateTime @default(now())
+  // Per-week generation targets, editable, defaulting to 4 and 2. Not a
+  // hard cap, generation aims for these counts across the week's slots.
+  lowEffortTarget Int @default(4)
+  batchTarget     Int @default(2)
 
   entries MealPlanEntry[]
+
+  @@unique([startDate])
 }
 
 model MealPlanEntry {
@@ -333,12 +547,30 @@ model MealPlanEntry {
   // Day this entry falls on, so entries can be reordered without reindexing.
   date       DateTime
   recipeId   String?
-  // True if this recipe was suggested then rejected during regeneration,
-  // kept so the regenerator can avoid repeating recent vetoes.
-  vetoed     Boolean  @default(false)
+  // Leaves this slot alone on a week-wide "Generate", and skipped by
+  // regeneration too, distinct from isLeftover which is a generation
+  // outcome rather than a user lock.
+  pinned     Boolean  @default(false)
+  // True when this slot was generated as "eat yesterday's leftovers"
+  // rather than a fresh dinner, placed automatically the day after a
+  // batch-friendly recipe. recipeId is null on a leftover slot, the actual
+  // dish is whatever leftoverOf points to.
+  isLeftover Boolean  @default(false)
+  leftoverOfEntryId String?
+  // Set once "Cooked it" is pressed from the planner, so the button can't
+  // double-log and the UI can show the slot as done. The CookLog row
+  // itself is the source of truth for cook history everywhere else.
+  cookedAt   DateTime?
+  // Recipe ids vetoed from this slot in past regenerations this week, so
+  // regenerating (or vetoing again) doesn't cycle back to something
+  // already rejected. JSON string array.
+  excludedRecipeIds Json?
 
-  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
-  recipe   Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  mealPlan   MealPlan        @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipe     Recipe?         @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  leftoverOf MealPlanEntry?  @relation("LeftoverOf", fields: [leftoverOfEntryId], references: [id], onDelete: SetNull)
+  leftoverEntries MealPlanEntry[] @relation("LeftoverOf")
 
+  @@unique([mealPlanId, date])
   @@index([mealPlanId])
 }
