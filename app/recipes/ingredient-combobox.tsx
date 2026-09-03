@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import type { IngredientCategory } from "@prisma/client";
 import { guessCategory } from "@/lib/guessCategory";
-import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/stockLevel";
 import { createIngredient } from "./actions";
 import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
@@ -28,8 +26,6 @@ export default function IngredientCombobox({
   const [query, setQuery] = useState(value?.name ?? "");
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [category, setCategory] = useState<IngredientCategory>("OTHER");
-  const [categoryTouched, setCategoryTouched] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEscapeToClose(open, () => setOpen(false));
 
@@ -45,9 +41,6 @@ export default function IngredientCombobox({
     (o) => o.name.toLowerCase() === query.trim().toLowerCase()
   );
 
-  const guessedCategory = query.trim() ? guessCategory(query.trim()) : "OTHER";
-  const effectiveCategory = categoryTouched ? category : guessedCategory;
-
   function handleBlur() {
     setTimeout(() => {
       if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
@@ -61,12 +54,11 @@ export default function IngredientCombobox({
     if (!name) return;
     setCreating(true);
     try {
-      const created = await createIngredient(name, effectiveCategory);
+      const created = await createIngredient(name, guessCategory(name));
       onCreated(created);
       onChange(created);
       setQuery(created.name);
       setOpen(false);
-      setCategoryTouched(false);
     } finally {
       setCreating(false);
     }
@@ -118,23 +110,6 @@ export default function IngredientCombobox({
               >
                 {creating ? "Creating…" : `+ Create "${query.trim()}"`}
               </button>
-              <label className="mt-1 flex items-center gap-2 px-2 text-xs text-ink-soft">
-                Category
-                <select
-                  className="flex-1 rounded border border-border-soft px-1.5 py-1 text-xs text-ink"
-                  value={effectiveCategory}
-                  onChange={(e) => {
-                    setCategory(e.target.value as IngredientCategory);
-                    setCategoryTouched(true);
-                  }}
-                >
-                  {CATEGORY_ORDER.map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_LABELS[c]}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
           )}
         </div>
