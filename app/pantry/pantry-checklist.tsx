@@ -50,6 +50,9 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
   const [items, setItems] = useState(initial);
   const [query, setQuery] = useState("");
   const [staplesOpen, setStaplesOpen] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<IngredientCategory>>(
+    () => new Set()
+  );
   const [creating, setCreating] = useState(false);
   const [createCategory, setCreateCategory] = useState<IngredientCategory | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -70,7 +73,12 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
     return items.filter((i) => i.name.toLowerCase().includes(q));
   }, [items, query]);
 
-  const trackedItems = filtered.filter((i) => !i.isStaple);
+  // Only ingredients actually being tracked here (an explicit stock level
+  // set at some point) show in the grouped list. The catalog holds every
+  // ingredient any recipe has ever used, most of which (water, egg white,
+  // a spice already covered by a staple) nobody wants to manage stock for,
+  // so appearing here is opt-in via "add to pantry", not automatic.
+  const trackedItems = filtered.filter((i) => !i.isStaple && i.stockLevel !== null);
   const stapleItems = filtered.filter((i) => i.isStaple);
 
   const groups = CATEGORY_ORDER.map((category) => ({
@@ -78,9 +86,10 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
     items: trackedItems.filter((i) => i.category === category),
   })).filter((g) => g.items.length > 0);
 
-  const exactMatch = items.some(
+  const matchedItem = items.find(
     (i) => i.name.toLowerCase() === query.trim().toLowerCase()
   );
+  const exactMatch = !!matchedItem;
   const guessedCategory = query.trim() ? guessCategory(query.trim()) : "OTHER";
   const effectiveCreateCategory = createCategory ?? guessedCategory;
 
@@ -89,6 +98,19 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
     startTransition(() => {
       setStockLevel(item.id, level);
     });
+  }
+
+  // An ingredient that already exists in the catalog (used in a recipe,
+  // say) but has never had a stock level set, so it isn't tracked here
+  // yet. Reuses the same upsert setStockLevel does for a normal toggle.
+  function addExistingToPantry(item: PantryItemData) {
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, stockLevel: "PLENTY" } : i)));
+    setLevels((prev) => ({ ...prev, [item.id]: "PLENTY" }));
+    startTransition(() => {
+      setStockLevel(item.id, "PLENTY");
+    });
+    setQuery("");
+    toast(`Added "${item.name}" to pantry`);
   }
 
   function changeCategory(item: PantryItemData, category: IngredientCategory) {
@@ -142,6 +164,9 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
     setCreating(true);
     try {
       const ingredient = await createPantryIngredient(name, effectiveCreateCategory);
+      // Created from the Pantry page itself, so the intent is unambiguous:
+      // track it right away rather than leaving it invisible until a
+      // separate "add to pantry" step.
       setItems((prev) => [
         ...prev,
         {
@@ -149,14 +174,17 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
           name: ingredient.name,
           category: ingredient.category,
           isStaple: ingredient.isStaple,
-          stockLevel: null,
+          stockLevel: "PLENTY",
           storageAdvice: getStaticStorageAdvice(ingredient.name, ingredient.category),
           hasCustomAdvice: false,
           satisfiesIds: [],
         },
       ]);
-      setLevels((prev) => ({ ...prev, [ingredient.id]: null }));
+      setLevels((prev) => ({ ...prev, [ingredient.id]: "PLENTY" }));
       setSatisfiesByItem((prev) => ({ ...prev, [ingredient.id]: [] }));
+      startTransition(() => {
+        setStockLevel(ingredient.id, "PLENTY");
+      });
       setQuery("");
       setCreateCategory(null);
       toast(`Added "${ingredient.name}"`);
@@ -300,6 +328,25 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
             }}
           />
         </div>
+        {query.trim() && matchedItem && matchedItem.stockLevel === null && !matchedItem.isStaple && (
+          <div className="mt-2 flex items-center gap-2 rounded-2xl border-2 border-green-deep bg-card p-2">
+            <button
+              type="button"
+              onClick={() => addExistingToPantry(matchedItem)}
+              className="block flex-1 rounded px-1 py-1 text-left text-sm font-medium text-green-deep"
+            >
+              {`+ Add "${matchedItem.name}" to pantry`}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Cancel"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-soft"
+            >
+              <IconX size={14} stroke={2} />
+            </button>
+          </div>
+        )}
         {query.trim() && !exactMatch && (
           <div className="mt-2 rounded-2xl border-2 border-green-deep bg-card p-2">
             <div className="flex items-center gap-2">
@@ -339,26 +386,47 @@ export default function PantryChecklist({ items: initial }: { items: PantryItemD
       </div>
 
       <div className="flex flex-col gap-4">
-        {groups.map((group, i) => (
-          <section
-            key={group.category}
-            style={{ animationDelay: `${i * 70}ms` }}
-            className="motion-safe:animate-fade-up-sm"
-          >
-            <h2 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-green-deep uppercase">
-              <span className="text-sm normal-case">{getCategoryEmoji(group.category)}</span>
-              {CATEGORY_LABELS[group.category]}
-              <span className="ml-auto text-xs font-normal text-ink-soft normal-case">
-                {group.items.length}
-              </span>
-            </h2>
-            <ul
-              className={`flex flex-col divide-y divide-border-soft rounded-2xl border-b-[3px] bg-card ${CATEGORY_BORDER_CLASS[group.category]}`}
+        {groups.map((group, i) => {
+          const isOpen = !collapsedCategories.has(group.category);
+          return (
+            <section
+              key={group.category}
+              style={{ animationDelay: `${i * 70}ms` }}
+              className="motion-safe:animate-fade-up-sm"
             >
-              {group.items.map((item) => renderRow(item, group.items))}
-            </ul>
-          </section>
-        ))}
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsedCategories((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(group.category)) next.delete(group.category);
+                    else next.add(group.category);
+                    return next;
+                  })
+                }
+                className="mb-2 flex w-full items-center gap-1.5 text-[11px] font-bold tracking-wide text-green-deep uppercase"
+              >
+                <span className="text-sm normal-case">{getCategoryEmoji(group.category)}</span>
+                {CATEGORY_LABELS[group.category]}
+                <span className="ml-auto text-xs font-normal text-ink-soft normal-case">
+                  {group.items.length}
+                </span>
+                <IconChevronDown
+                  size={14}
+                  stroke={2}
+                  className={`shrink-0 text-ink-soft transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                />
+              </button>
+              {isOpen && (
+                <ul
+                  className={`flex flex-col divide-y divide-border-soft rounded-2xl border-b-[3px] bg-card ${CATEGORY_BORDER_CLASS[group.category]}`}
+                >
+                  {group.items.map((item) => renderRow(item, group.items))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
 
         {groups.length === 0 && stapleItems.length === 0 && (
           <EmptyState
