@@ -49,7 +49,7 @@ export default function DetailHero({
         className={`pointer-events-none absolute -top-10 -right-10 h-36 w-36 rounded-full opacity-[0.28] ${accentClassName}`}
       />
 
-      <div className="relative flex items-center justify-between p-3">
+      <div className="relative flex items-center justify-between px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <HeroBackButton fallbackHref={backFallbackHref} />
         {topRight}
       </div>
