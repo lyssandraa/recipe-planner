@@ -42,6 +42,7 @@ export const CATEGORY_ORDER: IngredientCategory[] = [
   "DRY_GOODS",
   "TINS_JARS",
   "SPICES",
+  "BAKING",
   "FROZEN",
   "OTHER",
 ];
@@ -55,6 +56,7 @@ export const SHOPPING_CATEGORY_ORDER: IngredientCategory[] = [
   "DAIRY",
   "TINS_JARS",
   "DRY_GOODS",
+  "BAKING",
   "FROZEN",
   "SPICES",
   "OTHER",
@@ -67,6 +69,7 @@ export const CATEGORY_LABELS: Record<IngredientCategory, string> = {
   DRY_GOODS: "Dry goods",
   TINS_JARS: "Tins and jars",
   SPICES: "Spices",
+  BAKING: "Baking",
   FROZEN: "Frozen",
   OTHER: "Other",
 };
@@ -81,6 +84,7 @@ export const CATEGORY_BORDER_CLASS: Record<IngredientCategory, string> = {
   DRY_GOODS: "border-amber",
   TINS_JARS: "border-pink-tint",
   SPICES: "border-amber-tint",
+  BAKING: "border-terracotta-tint",
   FROZEN: "border-cream-grey",
   OTHER: "border-green-deep",
 };

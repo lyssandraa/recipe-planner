@@ -16,6 +16,7 @@ const SHOPPING_CATEGORY_EMOJI: Record<IngredientCategory, string> = {
   DRY_GOODS: "🌾",
   TINS_JARS: "🥫",
   SPICES: "🧂",
+  BAKING: "🧁",
   FROZEN: "❄️",
   OTHER: "🧺",
 };

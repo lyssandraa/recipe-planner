@@ -1,0 +1,4 @@
+-- Adds BAKING to the IngredientCategory enum. SQLite has no native enum
+-- type, Ingredient.category is a plain TEXT column, so a new enum member
+-- needs no DDL, this file exists only to keep the migration history and
+-- schema.prisma in sync.

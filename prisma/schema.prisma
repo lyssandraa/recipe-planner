@@ -125,6 +125,7 @@ enum IngredientCategory {
   DRY_GOODS
   TINS_JARS
   SPICES
+  BAKING
   FROZEN
   OTHER
 }

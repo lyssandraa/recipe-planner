@@ -84,6 +84,7 @@ const BY_CATEGORY: Partial<Record<IngredientCategory, string>> = {
   DRY_GOODS: DRY_GOODS_ADVICE,
   TINS_JARS: "Cool cupboard unopened, fridge once opened.",
   SPICES: "Airtight container away from light and heat, they lose flavour fast in the sun.",
+  BAKING: DRY_GOODS_ADVICE,
   FROZEN: "Keep frozen until you're ready to use it.",
 };
 

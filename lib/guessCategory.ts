@@ -107,6 +107,20 @@ const CATEGORY_KEYWORDS: Record<Exclude<IngredientCategory, "OTHER">, string[]> 
     "spice",
     "seasoning",
   ],
+  BAKING: [
+    "vanilla",
+    "chocolate",
+    "cocoa",
+    "baking powder",
+    "baking soda",
+    "bicarbonate",
+    "yeast",
+    "icing",
+    "sprinkles",
+    "food colouring",
+    "food coloring",
+    "marzipan",
+  ],
   FROZEN: ["frozen", "peas", "ice"],
 };
 
@@ -120,6 +134,9 @@ const CATEGORY_PRIORITY: Exclude<IngredientCategory, "OTHER">[] = [
   "TINS_JARS",
   "FROZEN",
   "SPICES",
+  // Before DRY_GOODS specifically: "icing sugar" should read as baking,
+  // not just match DRY_GOODS' plain "sugar" keyword.
+  "BAKING",
   "MEAT_FISH",
   "DAIRY",
   "PRODUCE",
