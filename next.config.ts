@@ -14,18 +14,31 @@ const nextConfig: NextConfig = {
   // native require resolves it normally instead.
   serverExternalPackages: ["tesseract.js"],
   // serverExternalPackages alone wasn't enough: Vercel's automatic file
-  // tracer found worker-script/node/index.js (it's referenced as a string
-  // when the worker thread is spawned) but couldn't then follow THAT
-  // file's own requires (require('..') etc.), since static tracing
-  // doesn't recurse into a dynamically-spawned worker script's dependency
-  // graph the way it does the main one. Confirmed by inspecting the trace
-  // manifest directly: only that one file was ever included. Force-
-  // including the whole package is the documented escape hatch for
-  // exactly this "tracer misses required files" case.
+  // tracer can't follow requires inside a dynamically-spawned worker
+  // thread's own dependency graph the way it does the main code path.
+  // Force-including just tesseract.js's own files fixed the first missing
+  // module (worker-script/index.js), then the next deploy failed on one
+  // of ITS dependencies (bmp-js) instead, not traced either. Blanket-
+  // including all of node_modules "fixes" that but is ~1GB, way past
+  // Vercel's function size limit, so this is the actual full dependency
+  // closure instead (tesseract.js's package.json deps, plus node-fetch's
+  // own whatwg-url, tr46 and webidl-conversions), checked by hand so this
+  // doesn't need another round of one-missing-module-at-a-time deploys.
   outputFileTracingIncludes: {
     "/shopping-list/tracker": [
       "./node_modules/tesseract.js/**/*",
       "./node_modules/tesseract.js-core/**/*",
+      "./node_modules/bmp-js/**/*",
+      "./node_modules/idb-keyval/**/*",
+      "./node_modules/is-url/**/*",
+      "./node_modules/node-fetch/**/*",
+      "./node_modules/opencollective-postinstall/**/*",
+      "./node_modules/regenerator-runtime/**/*",
+      "./node_modules/wasm-feature-detect/**/*",
+      "./node_modules/zlibjs/**/*",
+      "./node_modules/whatwg-url/**/*",
+      "./node_modules/tr46/**/*",
+      "./node_modules/webidl-conversions/**/*",
     ],
   },
   // Default Server Action body limit is 1MB, far smaller than a real
