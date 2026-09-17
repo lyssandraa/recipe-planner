@@ -193,6 +193,7 @@ model Ingredient {
   productIngredients ProductIngredient[]
   info               IngredientInfo?
   shoppingListItems  ShoppingListItem[]
+  shoppingTripItems  ShoppingTripItem[]
 
   // "Satisfies" means having this ingredient means I don't need the other,
   // e.g. unsalted butter satisfies butter. Distinct from IngredientSynonym,
@@ -532,20 +533,43 @@ model ShoppingListItem {
   @@index([ingredientId])
 }
 
-// One row per "clear the trolley" action, for the monthly shopping
-// tracker. The list itself is transient (ShoppingListItem rows are deleted
-// once bought), so this is the only history that survives: a snapshot
-// taken at clear time, not a live relation to items that no longer exist.
-// totalSpent is optional, typed in at clear time, an item count and date
-// are still worth keeping even for a trip nobody bothered to price.
+// One row per "clear the trolley" action (or a manually logged/scanned
+// trip), for the monthly shopping tracker. The list itself is transient
+// (ShoppingListItem rows are deleted once bought), so this is the only
+// history that survives: a snapshot taken at clear time, not a live
+// relation to items that no longer exist. totalSpent is a manually typed
+// or receipt-read lump sum, independent of whatever the line items sum to
+// (a receipt has tax/discounts an item list doesn't), null is fine, a trip
+// is still worth keeping for its date and item count even unpriced.
 model ShoppingTrip {
   id         String   @id @default(cuid())
   date       DateTime @default(now())
   totalSpent Float?
   itemCount  Int
-  itemNames  Json
+  items      ShoppingTripItem[]
 
   @@index([date])
+}
+
+// A single line item within a trip, each with its own optional price so
+// the tracker can build real per-ingredient price history over time, not
+// just one lump sum per trip. ingredientId is best-effort (the same
+// catalog matcher every other import path uses), left null when nothing
+// matches rather than forcing a bad match, price prediction just skips
+// unmatched rows.
+model ShoppingTripItem {
+  id           String  @id @default(cuid())
+  tripId       String
+  name         String
+  quantityText String?
+  price        Float?
+  ingredientId String?
+
+  trip       ShoppingTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  ingredient Ingredient?  @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  @@index([tripId])
+  @@index([ingredientId])
 }
 
 // A week of dinner planning, one entry per day. UI comes later; modelled now.

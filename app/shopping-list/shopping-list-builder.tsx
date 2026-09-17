@@ -51,6 +51,7 @@ export default function ShoppingListBuilder({
   const [manualName, setManualName] = useState("");
   const [manualQuantity, setManualQuantity] = useState("");
   const [clearing, setClearing] = useState(false);
+  const [itemPrices, setItemPrices] = useState<Record<string, string>>({});
   const [spendInput, setSpendInput] = useState("");
   const [isPending, startTransition] = useTransition();
   const toast = useToast();
@@ -142,16 +143,39 @@ export default function ShoppingListBuilder({
     });
   }
 
+  const toBuyItems = items.filter((i) => !i.checked);
+  const tickedItems = items.filter((i) => i.checked);
+
+  const itemPriceSum = tickedItems.reduce((sum, item) => {
+    const val = Number((itemPrices[item.id] ?? "").trim());
+    return Number.isFinite(val) && itemPrices[item.id]?.trim() ? sum + val : sum;
+  }, 0);
+  const anyItemPriced = tickedItems.some((item) => (itemPrices[item.id] ?? "").trim());
+
   function handleConfirmClear() {
-    const trimmed = spendInput.trim();
-    const totalSpent = trimmed ? Number(trimmed) : null;
+    const parsedItemPrices: Record<string, number | null> = {};
+    for (const item of tickedItems) {
+      const raw = (itemPrices[item.id] ?? "").trim();
+      const val = raw ? Number(raw) : null;
+      parsedItemPrices[item.id] = val != null && Number.isFinite(val) ? val : null;
+    }
+
+    const overrideTrimmed = spendInput.trim();
+    const overrideVal = overrideTrimmed ? Number(overrideTrimmed) : null;
+    const totalSpent = overrideTrimmed
+      ? overrideVal != null && Number.isFinite(overrideVal)
+        ? overrideVal
+        : null
+      : anyItemPriced
+        ? itemPriceSum
+        : null;
+
     startTransition(async () => {
-      const result = await clearTickedItems(
-        totalSpent != null && !Number.isNaN(totalSpent) ? totalSpent : null
-      );
+      const result = await clearTickedItems(parsedItemPrices, totalSpent);
       setItems(result);
       setClearing(false);
       setSpendInput("");
+      setItemPrices({});
       toast("Cleared, shop logged");
     });
   }
@@ -164,9 +188,6 @@ export default function ShoppingListBuilder({
       toast(`Added "${item.name}"`);
     });
   }
-
-  const toBuyItems = items.filter((i) => !i.checked);
-  const tickedItems = items.filter((i) => i.checked);
 
   const groups = SHOPPING_CATEGORY_ORDER.map((category) => ({
     category,
@@ -377,8 +398,8 @@ export default function ShoppingListBuilder({
 
       {clearing && (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/30 p-4">
-          <div className="w-full max-w-[380px] rounded-2xl bg-card p-4 shadow-lg">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="flex max-h-[85vh] w-full max-w-[380px] flex-col rounded-2xl bg-card shadow-lg">
+            <div className="flex items-center justify-between p-4 pb-2">
               <h2 className="text-sm font-semibold text-ink">
                 Log this shop ({tickedItems.length} item{tickedItems.length === 1 ? "" : "s"})
               </h2>
@@ -391,31 +412,62 @@ export default function ShoppingListBuilder({
                 <IconX size={16} stroke={2} />
               </button>
             </div>
-            <label className="flex items-center gap-2 rounded-[12px] border border-border-soft px-3 py-2.5">
-              <span className="text-sm text-ink-soft">£</span>
-              <input
-                autoFocus
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="Total spent (optional)"
-                value={spendInput}
-                onChange={(e) => setSpendInput(e.target.value)}
-                className="w-full border-none bg-transparent text-sm text-ink placeholder:text-ink-soft focus:outline-none"
-              />
-            </label>
-            <p className="mt-1.5 text-xs text-ink-soft">
-              Leave blank to skip, the trip still gets logged for the tracker.
-            </p>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={handleConfirmClear}
-              className="mt-3 w-full rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {isPending ? "Clearing…" : "Clear list"}
-            </button>
+
+            <div className="flex-1 overflow-y-auto px-4">
+              <p className="mb-1.5 text-xs text-ink-soft">
+                Price what you can, skip the rest, it's all optional.
+              </p>
+              <ul className="flex flex-col divide-y divide-border-soft">
+                {tickedItems.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{item.name}</span>
+                    <label className="flex w-24 shrink-0 items-center gap-1 rounded-[10px] border border-border-soft px-2 py-1">
+                      <span className="text-xs text-ink-soft">£</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={itemPrices[item.id] ?? ""}
+                        onChange={(e) =>
+                          setItemPrices((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        className="w-full border-none bg-transparent text-sm text-ink focus:outline-none"
+                      />
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="p-4 pt-3">
+              <label className="flex items-center gap-2 rounded-[12px] border border-border-soft px-3 py-2.5">
+                <span className="text-sm text-ink-soft">£</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder={anyItemPriced ? itemPriceSum.toFixed(2) : "Total spent (optional)"}
+                  value={spendInput}
+                  onChange={(e) => setSpendInput(e.target.value)}
+                  className="w-full border-none bg-transparent text-sm text-ink placeholder:text-ink-soft focus:outline-none"
+                />
+              </label>
+              <p className="mt-1.5 text-xs text-ink-soft">
+                {anyItemPriced
+                  ? `Defaults to the ${itemPriceSum.toFixed(2)} above, type here to override (tax, a discount, rounding).`
+                  : "Leave blank to skip, the trip still gets logged for the tracker."}
+              </p>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleConfirmClear}
+                className="mt-3 w-full rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {isPending ? "Clearing…" : "Clear list"}
+              </button>
+            </div>
           </div>
         </div>
       )}

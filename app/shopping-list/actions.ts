@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { buildShoppingList } from "@/lib/shopping";
 import { formatQuantityUnit } from "@/lib/units";
 import { getPantryStockSets } from "@/lib/pantryStock";
+import { resolveIngredientId } from "@/lib/resolveIngredient";
 
 export type ShoppingListItemData = {
   id: string;
@@ -242,12 +243,25 @@ export async function deleteShoppingItem(id: string): Promise<ShoppingListItemDa
 
 // Logs a ShoppingTrip snapshot before deleting, so the monthly tracker has
 // something to look back on even though the list rows themselves don't
-// survive being bought. totalSpent is optional, a trip is still worth
-// recording (date, item count) even when nobody types in an amount.
-export async function clearTickedItems(totalSpent: number | null = null) {
+// survive being bought. itemPrices is keyed by ShoppingListItem id, missing
+// or null entries just mean that item's price wasn't entered, the trip and
+// its item rows are still worth recording either way. totalSpent is a
+// separate figure (typically the live sum of itemPrices, but editable),
+// kept distinct since a real receipt has tax/discounts no per-item price
+// accounts for.
+export async function clearTickedItems(
+  itemPrices: Record<string, number | null>,
+  totalSpent: number | null = null
+) {
   const ticked = await prisma.shoppingListItem.findMany({
     where: { checked: true },
-    select: { name: true },
+    select: {
+      id: true,
+      name: true,
+      quantityText: true,
+      overrideQuantityText: true,
+      ingredientId: true,
+    },
   });
 
   if (ticked.length > 0) {
@@ -255,7 +269,14 @@ export async function clearTickedItems(totalSpent: number | null = null) {
       data: {
         totalSpent,
         itemCount: ticked.length,
-        itemNames: ticked.map((i) => i.name),
+        items: {
+          create: ticked.map((i) => ({
+            name: i.name,
+            quantityText: i.overrideQuantityText ?? i.quantityText,
+            price: itemPrices[i.id] ?? null,
+            ingredientId: i.ingredientId,
+          })),
+        },
       },
     });
   }
@@ -266,12 +287,19 @@ export async function clearTickedItems(totalSpent: number | null = null) {
   return getShoppingListItems();
 }
 
+export type ShoppingTripItemData = {
+  id: string;
+  name: string;
+  quantityText: string | null;
+  price: number | null;
+};
+
 export type ShoppingTripData = {
   id: string;
   date: string;
   totalSpent: number | null;
   itemCount: number;
-  itemNames: string[];
+  items: ShoppingTripItemData[];
 };
 
 export type MonthlyShoppingSummary = {
@@ -281,54 +309,90 @@ export type MonthlyShoppingSummary = {
   // optional per trip, "average" should divide by what's actually known.
   tripsWithSpend: number;
   totalItems: number;
+  // A simple recency-weighted look at recently priced trips, for "about
+  // how much does a shop cost these days". Null until there's at least one
+  // priced trip anywhere, not just this month, a slow month shouldn't lose
+  // the estimate entirely.
+  predictedNextTrip: number | null;
 };
 
 export async function getShoppingTripsForMonth(monthStart: Date): Promise<MonthlyShoppingSummary> {
   const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
-  const rows = await prisma.shoppingTrip.findMany({
-    where: { date: { gte: monthStart, lt: monthEnd } },
-    orderBy: { date: "desc" },
-  });
+  const [rows, recentPriced] = await Promise.all([
+    prisma.shoppingTrip.findMany({
+      where: { date: { gte: monthStart, lt: monthEnd } },
+      orderBy: { date: "desc" },
+      include: { items: true },
+    }),
+    prisma.shoppingTrip.findMany({
+      where: { totalSpent: { not: null } },
+      orderBy: { date: "desc" },
+      take: 5,
+      select: { totalSpent: true },
+    }),
+  ]);
 
   const trips: ShoppingTripData[] = rows.map((r) => ({
     id: r.id,
     date: r.date.toISOString(),
     totalSpent: r.totalSpent,
     itemCount: r.itemCount,
-    itemNames: Array.isArray(r.itemNames) ? (r.itemNames as string[]) : [],
+    items: r.items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      quantityText: i.quantityText,
+      price: i.price,
+    })),
   }));
 
   const priced = trips.filter((t) => t.totalSpent != null);
+  const predictedNextTrip =
+    recentPriced.length > 0
+      ? recentPriced.reduce((sum, t) => sum + (t.totalSpent ?? 0), 0) / recentPriced.length
+      : null;
 
   return {
     trips,
     totalSpent: priced.reduce((sum, t) => sum + (t.totalSpent ?? 0), 0),
     tripsWithSpend: priced.length,
     totalItems: trips.reduce((sum, t) => sum + t.itemCount, 0),
+    predictedNextTrip,
   };
 }
 
-// A trip logged directly from the tracker, not from clearing the trolley,
-// for a shop that never went through the list at all (a corner shop run,
-// a market stall) or one from before this feature existed. note is a free
-// comma-separated list, split the same shape as itemNames so it renders
-// the same way, empty is fine, an expense doesn't have to name items.
-export async function addManualShoppingTrip(input: {
+export type TripItemInput = {
+  name: string;
+  quantityText: string | null;
+  price: number | null;
+};
+
+// Saves a trip logged directly (not from clearing the trolley): a manual
+// expense, or the reviewed result of a scanned receipt. Each item is
+// matched against the ingredient catalog on a best-effort basis, same
+// matcher every other import path uses, left unmatched rather than forcing
+// a bad link.
+export async function saveShoppingTrip(input: {
   date: string;
   totalSpent: number | null;
-  note: string;
+  items: TripItemInput[];
 }) {
-  const itemNames = input.note
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const items = await Promise.all(
+    input.items
+      .filter((i) => i.name.trim())
+      .map(async (i) => ({
+        name: i.name.trim(),
+        quantityText: i.quantityText?.trim() || null,
+        price: i.price,
+        ingredientId: await resolveIngredientId(i.name),
+      }))
+  );
 
   await prisma.shoppingTrip.create({
     data: {
       date: new Date(`${input.date}T12:00:00`),
       totalSpent: input.totalSpent,
-      itemCount: itemNames.length,
-      itemNames,
+      itemCount: items.length,
+      items: { create: items },
     },
   });
   revalidatePath("/shopping-list/tracker");

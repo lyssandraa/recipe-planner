@@ -9,6 +9,7 @@ import {
   IconChevronRight,
   IconPencil,
   IconPlus,
+  IconSparkles,
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
@@ -19,11 +20,12 @@ import { useEscapeToClose } from "@/lib/useEscapeToClose";
 import { addMonths, formatMonthLabel, formatMonthParam, parseMonthParam } from "@/lib/month";
 import { formatGBP } from "@/lib/currency";
 import {
-  addManualShoppingTrip,
+  saveShoppingTrip,
   updateShoppingTrip,
   deleteShoppingTrip,
   type MonthlyShoppingSummary,
 } from "../actions";
+import TripItemEditor, { type EditableTripItem } from "./trip-item-editor";
 
 function todayParam(): string {
   const d = new Date();
@@ -43,7 +45,7 @@ export default function TrackerView({
   const [adding, setAdding] = useState(false);
   const [newDate, setNewDate] = useState(todayParam());
   const [newAmount, setNewAmount] = useState("");
-  const [newNote, setNewNote] = useState("");
+  const [newItems, setNewItems] = useState<EditableTripItem[]>([]);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -88,19 +90,29 @@ export default function TrackerView({
     });
   }
 
+  function openAdd() {
+    setNewDate(todayParam());
+    setNewAmount("");
+    setNewItems([]);
+    setAdding(true);
+  }
+
   function handleAddExpense() {
     const trimmed = newAmount.trim();
     const amount = trimmed ? Number(trimmed) : null;
     startTransition(async () => {
-      await addManualShoppingTrip({
+      await saveShoppingTrip({
         date: newDate,
         totalSpent: amount != null && !Number.isNaN(amount) ? amount : null,
-        note: newNote,
+        items: newItems
+          .filter((i) => i.name.trim())
+          .map((i) => ({
+            name: i.name,
+            quantityText: i.quantityText || null,
+            price: i.price.trim() ? Number(i.price) : null,
+          })),
       });
       setAdding(false);
-      setNewAmount("");
-      setNewNote("");
-      setNewDate(todayParam());
       toast("Expense added");
       router.refresh();
     });
@@ -130,9 +142,20 @@ export default function TrackerView({
         <StatsStrip cells={cells} />
       </div>
 
+      {summary.predictedNextTrip != null && (
+        <div className="flex items-center gap-2.5 rounded-2xl bg-amber-tint px-4 py-3">
+          <IconSparkles size={18} stroke={1.75} className="shrink-0 text-amber-text" />
+          <p className="text-sm text-amber-text">
+            Your next shop will probably cost around{" "}
+            <span className="font-semibold">{formatGBP(summary.predictedNextTrip)}</span>, based
+            on recent priced trips.
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={() => setAdding(true)}
+        onClick={openAdd}
         className="flex items-center justify-center gap-2 rounded-[12px] border-2 border-green-deep px-4 py-2.5 text-sm font-medium text-green-deep"
       >
         <IconPlus size={16} stroke={2} />
@@ -181,17 +204,22 @@ export default function TrackerView({
                 </button>
                 {open && (
                   <div className="border-t border-border-soft px-3.5 py-3">
-                    {trip.itemNames.length > 0 && (
-                      <div className="mb-3 flex flex-wrap gap-1.5">
-                        {trip.itemNames.map((name, i) => (
-                          <span
-                            key={i}
-                            className="rounded-full bg-cream-grey px-2.5 py-1 text-xs text-cream-grey-text"
-                          >
-                            {name}
-                          </span>
+                    {trip.items.length > 0 && (
+                      <ul className="mb-3 flex flex-col divide-y divide-border-soft">
+                        {trip.items.map((item) => (
+                          <li key={item.id} className="flex items-center gap-2 py-1.5 text-sm">
+                            <span className="min-w-0 flex-1 truncate text-ink">
+                              {item.name}
+                              {item.quantityText && (
+                                <span className="text-ink-soft"> · {item.quantityText}</span>
+                              )}
+                            </span>
+                            <span className="shrink-0 text-ink-soft">
+                              {item.price != null ? formatGBP(item.price) : "-"}
+                            </span>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     )}
                     {editing ? (
                       <div className="flex items-center gap-2">
@@ -256,8 +284,8 @@ export default function TrackerView({
 
       {adding && (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/30 p-4">
-          <div className="w-full max-w-[380px] rounded-2xl bg-card p-4 shadow-lg">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="flex max-h-[85vh] w-full max-w-[380px] flex-col rounded-2xl bg-card shadow-lg">
+            <div className="flex items-center justify-between p-4 pb-2">
               <h2 className="text-sm font-semibold text-ink">Add expense</h2>
               <button
                 type="button"
@@ -268,42 +296,43 @@ export default function TrackerView({
                 <IconX size={16} stroke={2} />
               </button>
             </div>
-            <div className="flex flex-col gap-2">
-              <input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="rounded-[12px] border border-border-soft px-3 py-2.5 text-sm text-ink"
-              />
-              <label className="flex items-center gap-2 rounded-[12px] border border-border-soft px-3 py-2.5">
-                <span className="text-sm text-ink-soft">£</span>
+            <div className="flex-1 overflow-y-auto px-4">
+              <div className="flex flex-col gap-2">
                 <input
-                  autoFocus
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  placeholder="Amount"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  className="w-full border-none bg-transparent text-sm text-ink placeholder:text-ink-soft focus:outline-none"
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="rounded-[12px] border border-border-soft px-3 py-2.5 text-sm text-ink"
                 />
-              </label>
-              <input
-                placeholder="What was it for? (optional, comma separated)"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="rounded-[12px] border border-border-soft px-3 py-2.5 text-sm text-ink placeholder:text-ink-soft"
-              />
+                <label className="flex items-center gap-2 rounded-[12px] border border-border-soft px-3 py-2.5">
+                  <span className="text-sm text-ink-soft">£</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="Total (optional)"
+                    value={newAmount}
+                    onChange={(e) => setNewAmount(e.target.value)}
+                    className="w-full border-none bg-transparent text-sm text-ink placeholder:text-ink-soft focus:outline-none"
+                  />
+                </label>
+              </div>
+              <p className="mt-3 mb-1.5 text-xs font-medium text-ink-soft">
+                Items (optional, for price history)
+              </p>
+              <TripItemEditor items={newItems} onChange={setNewItems} />
             </div>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={handleAddExpense}
-              className="mt-3 w-full rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {isPending ? "Adding…" : "Add expense"}
-            </button>
+            <div className="p-4 pt-3">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleAddExpense}
+                className="w-full rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {isPending ? "Adding…" : "Add expense"}
+              </button>
+            </div>
           </div>
         </div>
       )}
