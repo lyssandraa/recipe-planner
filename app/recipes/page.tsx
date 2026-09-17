@@ -137,7 +137,7 @@ export default async function RecipesPage({
             <span />
           )}
           <Link href="/recipes/import" className="text-xs text-green-deep underline">
-            Import from URL
+            Import a recipe
           </Link>
         </div>
         <RecipeList recipes={cards} initialQuery={q ?? ""} />

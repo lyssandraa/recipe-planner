@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconFileTypePdf, IconLink } from "@tabler/icons-react";
 import type { MealType, Unit } from "@prisma/client";
 import IngredientCombobox, {
   type IngredientOption,
 } from "@/app/recipes/ingredient-combobox";
 import {
   parseRecipeFromUrl,
+  parseRecipeFromPdf,
   saveImportedRecipe,
   type ImportPreview,
   type ImportedIngredientRow,
@@ -48,10 +49,13 @@ export default function ImportForm({
 }: {
   ingredientOptions: IngredientOption[];
 }) {
+  const [mode, setMode] = useState<"url" | "pdf">("url");
   const [url, setUrl] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isFetching, startFetching] = useTransition();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [sourceLabel, setSourceLabel] = useState("");
   const [options, setOptions] = useState<IngredientOption[]>(ingredientOptions);
   const router = useRouter();
   const goBack = useBackOrFallback("/recipes");
@@ -64,9 +68,28 @@ export default function ImportForm({
       try {
         const result = await parseRecipeFromUrl(trimmed);
         setPreview(result);
+        setSourceLabel(trimmed);
       } catch (e) {
         setFetchError(
           e instanceof Error ? e.message : "Couldn't read that page."
+        );
+      }
+    });
+  }
+
+  function handleParsePdf() {
+    setFetchError(null);
+    if (!pdfFile) return;
+    startFetching(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("file", pdfFile);
+        const result = await parseRecipeFromPdf(formData);
+        setPreview(result);
+        setSourceLabel(`Imported from PDF: ${pdfFile.name}`);
+      } catch (e) {
+        setFetchError(
+          e instanceof Error ? e.message : "Couldn't read that PDF."
         );
       }
     });
@@ -83,25 +106,84 @@ export default function ImportForm({
           <IconArrowLeft size={15} stroke={2} />
           Back
         </button>
-        <label className="text-sm font-medium">Recipe URL</label>
-        <input
-          className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
-          placeholder="https://example.com/some-recipe"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-        {fetchError && <p className="text-sm text-terracotta-text">{fetchError}</p>}
-        <button
-          type="button"
-          disabled={isFetching || !url.trim()}
-          onClick={handleFetch}
-          className="rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {isFetching ? "Fetching…" : "Fetch recipe"}
-        </button>
-        <p className="text-xs text-ink-soft">
-          Nothing is saved until you review and confirm on the next screen.
-        </p>
+
+        <div className="flex gap-2 rounded-full bg-cream-grey p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("url");
+              setFetchError(null);
+            }}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-sm font-medium ${
+              mode === "url" ? "bg-card text-green-deep shadow-sm" : "text-cream-grey-text"
+            }`}
+          >
+            <IconLink size={15} stroke={1.75} />
+            From a URL
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("pdf");
+              setFetchError(null);
+            }}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-sm font-medium ${
+              mode === "pdf" ? "bg-card text-green-deep shadow-sm" : "text-cream-grey-text"
+            }`}
+          >
+            <IconFileTypePdf size={15} stroke={1.75} />
+            From a PDF
+          </button>
+        </div>
+
+        {mode === "url" ? (
+          <>
+            <label className="text-sm font-medium">Recipe URL</label>
+            <input
+              className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
+              placeholder="https://example.com/some-recipe"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            {fetchError && <p className="text-sm text-terracotta-text">{fetchError}</p>}
+            <button
+              type="button"
+              disabled={isFetching || !url.trim()}
+              onClick={handleFetch}
+              className="rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {isFetching ? "Fetching…" : "Fetch recipe"}
+            </button>
+            <p className="text-xs text-ink-soft">
+              Nothing is saved until you review and confirm on the next screen.
+            </p>
+          </>
+        ) : (
+          <>
+            <label className="text-sm font-medium">Recipe PDF</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+              className="rounded-[12px] border border-border-soft px-3 py-2 text-sm"
+            />
+            {fetchError && <p className="text-sm text-terracotta-text">{fetchError}</p>}
+            <button
+              type="button"
+              disabled={isFetching || !pdfFile}
+              onClick={handleParsePdf}
+              className="rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {isFetching ? "Reading…" : "Read PDF"}
+            </button>
+            <p className="text-xs text-ink-soft">
+              Works for a PDF with real text in it (printed from a webpage, exported from a
+              document), not a scanned or photographed page. No AI involved, nothing is saved
+              until you review and confirm on the next screen, and the split into title,
+              ingredients and steps is a best guess you can fix by hand there.
+            </p>
+          </>
+        )}
       </div>
     );
   }
@@ -109,12 +191,13 @@ export default function ImportForm({
   return (
     <ReviewStep
       preview={preview}
-      sourceUrl={url.trim()}
+      sourceUrl={sourceLabel}
       options={options}
       onOptionsChange={setOptions}
       onStartOver={() => {
         setPreview(null);
         setUrl("");
+        setPdfFile(null);
       }}
       onSaved={(recipeId) => router.push(`/recipes/${recipeId}`)}
     />

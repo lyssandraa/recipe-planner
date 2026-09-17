@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { MealType, Unit } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseRecipe, type ParsedRecipeDraft } from "@/lib/import/parseRecipe";
+import { extractPdfText } from "@/lib/import/pdfText";
+import { parseRecipeText } from "@/lib/import/parseRecipeText";
 import { resolveIngredientId } from "@/lib/resolveIngredient";
 import { serializeInstructions } from "@/lib/instructions";
 
@@ -20,6 +22,33 @@ export type ImportPreview = Omit<ParsedRecipeDraft, "ingredients"> & {
 // Nothing is written to the database here.
 export async function parseRecipeFromUrl(url: string): Promise<ImportPreview> {
   const draft = await parseRecipe(url);
+  const ingredients = await Promise.all(
+    draft.ingredients.map(async (ing) => ({
+      ...ing,
+      matchedIngredientId: await resolveIngredientId(ing.name),
+    }))
+  );
+  return { ...draft, ingredients };
+}
+
+// No structured markup to lean on in a PDF (unlike a recipe website's
+// JSON-LD), so this extracts the text layer and runs it through the same
+// heading/line heuristics as a plain-text import. Only works for a PDF with
+// a real embedded text layer, a scanned/photographed page has none.
+export async function parseRecipeFromPdf(formData: FormData): Promise<ImportPreview> {
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("No file provided.");
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const text = await extractPdfText(buffer);
+  if (!text.trim()) {
+    throw new Error(
+      "Couldn't find any text in that PDF. If it's a scanned or photographed page, there's no text layer to read."
+    );
+  }
+
+  const fallbackTitle = file.name.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() || "Untitled recipe";
+  const draft = parseRecipeText(text, fallbackTitle);
   const ingredients = await Promise.all(
     draft.ingredients.map(async (ing) => ({
       ...ing,
