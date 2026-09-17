@@ -8,6 +8,7 @@ import {
   IconChevronDown,
   IconClockExclamation,
   IconPlus,
+  IconX,
 } from "@tabler/icons-react";
 import EmptyState from "@/app/components/empty-state";
 import { useToast } from "@/app/components/toast-provider";
@@ -47,9 +48,12 @@ export default function ShoppingListBuilder({
   const [recipesOpen, setRecipesOpen] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualQuantity, setManualQuantity] = useState("");
+  const [clearing, setClearing] = useState(false);
+  const [spendInput, setSpendInput] = useState("");
   const [isPending, startTransition] = useTransition();
   const toast = useToast();
   useEscapeToClose(recipesOpen, () => setRecipesOpen(false));
+  useEscapeToClose(clearing, () => setClearing(false));
   // Compares against the last selection actually synced, rather than a
   // one-shot "have we run yet" flag: React Strict Mode double-invokes
   // effects in development, which would flip a boolean flag on its first
@@ -128,14 +132,17 @@ export default function ShoppingListBuilder({
     });
   }
 
-  function handleClearTicked() {
-    if (!confirm(`Clear ${tickedItems.length} ticked item${tickedItems.length === 1 ? "" : "s"}? This can't be undone.`)) {
-      return;
-    }
+  function handleConfirmClear() {
+    const trimmed = spendInput.trim();
+    const totalSpent = trimmed ? Number(trimmed) : null;
     startTransition(async () => {
-      const result = await clearTickedItems();
+      const result = await clearTickedItems(
+        totalSpent != null && !Number.isNaN(totalSpent) ? totalSpent : null
+      );
       setItems(result);
-      toast("Cleared");
+      setClearing(false);
+      setSpendInput("");
+      toast("Cleared, shop logged");
     });
   }
 
@@ -322,7 +329,7 @@ export default function ShoppingListBuilder({
               <h2 className="text-sm font-semibold text-ink">In the trolley</h2>
               <button
                 type="button"
-                onClick={handleClearTicked}
+                onClick={() => setClearing(true)}
                 className="text-xs text-ink-soft underline"
               >
                 Clear ({tickedItems.length})
@@ -345,6 +352,51 @@ export default function ShoppingListBuilder({
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+      )}
+
+      {clearing && (
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/30 p-4">
+          <div className="w-full max-w-[380px] rounded-2xl bg-card p-4 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">
+                Log this shop ({tickedItems.length} item{tickedItems.length === 1 ? "" : "s"})
+              </h2>
+              <button
+                type="button"
+                onClick={() => setClearing(false)}
+                aria-label="Cancel"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft"
+              >
+                <IconX size={16} stroke={2} />
+              </button>
+            </div>
+            <label className="flex items-center gap-2 rounded-[12px] border border-border-soft px-3 py-2.5">
+              <span className="text-sm text-ink-soft">£</span>
+              <input
+                autoFocus
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="Total spent (optional)"
+                value={spendInput}
+                onChange={(e) => setSpendInput(e.target.value)}
+                className="w-full border-none bg-transparent text-sm text-ink placeholder:text-ink-soft focus:outline-none"
+              />
+            </label>
+            <p className="mt-1.5 text-xs text-ink-soft">
+              Leave blank to skip, the trip still gets logged for the tracker.
+            </p>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={handleConfirmClear}
+              className="mt-3 w-full rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {isPending ? "Clearing…" : "Clear list"}
+            </button>
           </div>
         </div>
       )}

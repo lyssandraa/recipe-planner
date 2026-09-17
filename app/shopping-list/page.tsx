@@ -32,6 +32,7 @@ export default async function ShoppingListPage() {
         title="Shopping list"
         icon={<IconShoppingBag size={24} stroke={1.75} />}
         accents={["amber", "lime"]}
+        action={{ label: "Tracker", href: "/shopping-list/tracker" }}
         extra={
           <div>
             <div className="flex items-center gap-6">

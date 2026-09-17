@@ -228,10 +228,72 @@ export async function toggleShoppingItemChecked(id: string, checked: boolean) {
   revalidatePath("/shopping-list");
 }
 
-export async function clearTickedItems() {
+// Logs a ShoppingTrip snapshot before deleting, so the monthly tracker has
+// something to look back on even though the list rows themselves don't
+// survive being bought. totalSpent is optional, a trip is still worth
+// recording (date, item count) even when nobody types in an amount.
+export async function clearTickedItems(totalSpent: number | null = null) {
+  const ticked = await prisma.shoppingListItem.findMany({
+    where: { checked: true },
+    select: { name: true },
+  });
+
+  if (ticked.length > 0) {
+    await prisma.shoppingTrip.create({
+      data: {
+        totalSpent,
+        itemCount: ticked.length,
+        itemNames: ticked.map((i) => i.name),
+      },
+    });
+  }
+
   await prisma.shoppingListItem.deleteMany({ where: { checked: true } });
   revalidatePath("/shopping-list");
+  revalidatePath("/shopping-list/tracker");
   return getShoppingListItems();
+}
+
+export type ShoppingTripData = {
+  id: string;
+  date: string;
+  totalSpent: number | null;
+  itemCount: number;
+  itemNames: string[];
+};
+
+export type MonthlyShoppingSummary = {
+  trips: ShoppingTripData[];
+  totalSpent: number;
+  // Trips actually priced, distinct from trips.length, since totalSpent is
+  // optional per trip, "average" should divide by what's actually known.
+  tripsWithSpend: number;
+  totalItems: number;
+};
+
+export async function getShoppingTripsForMonth(monthStart: Date): Promise<MonthlyShoppingSummary> {
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+  const rows = await prisma.shoppingTrip.findMany({
+    where: { date: { gte: monthStart, lt: monthEnd } },
+    orderBy: { date: "desc" },
+  });
+
+  const trips: ShoppingTripData[] = rows.map((r) => ({
+    id: r.id,
+    date: r.date.toISOString(),
+    totalSpent: r.totalSpent,
+    itemCount: r.itemCount,
+    itemNames: Array.isArray(r.itemNames) ? (r.itemNames as string[]) : [],
+  }));
+
+  const priced = trips.filter((t) => t.totalSpent != null);
+
+  return {
+    trips,
+    totalSpent: priced.reduce((sum, t) => sum + (t.totalSpent ?? 0), 0),
+    tripsWithSpend: priced.length,
+    totalItems: trips.reduce((sum, t) => sum + t.itemCount, 0),
+  };
 }
 
 // Used by the planner's "send this week's missing ingredients" action.

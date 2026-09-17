@@ -532,6 +532,22 @@ model ShoppingListItem {
   @@index([ingredientId])
 }
 
+// One row per "clear the trolley" action, for the monthly shopping
+// tracker. The list itself is transient (ShoppingListItem rows are deleted
+// once bought), so this is the only history that survives: a snapshot
+// taken at clear time, not a live relation to items that no longer exist.
+// totalSpent is optional, typed in at clear time, an item count and date
+// are still worth keeping even for a trip nobody bothered to price.
+model ShoppingTrip {
+  id         String   @id @default(cuid())
+  date       DateTime @default(now())
+  totalSpent Float?
+  itemCount  Int
+  itemNames  Json
+
+  @@index([date])
+}
+
 // A week of dinner planning, one entry per day. UI comes later; modelled now.
 model MealPlan {
   id        String   @id @default(cuid())
