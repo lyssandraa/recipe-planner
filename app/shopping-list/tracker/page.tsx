@@ -1,7 +1,7 @@
 import { IconReceipt } from "@tabler/icons-react";
 import PageHeader from "@/app/components/page-header";
 import { getMonthStart, parseMonthParam, formatMonthParam } from "@/lib/month";
-import { getShoppingTripsForMonth } from "../actions";
+import { getShoppingTripsForMonth, getShoppingListCostEstimate } from "../actions";
 import TrackerView from "./tracker-view";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,10 @@ export default async function ShoppingTrackerPage({
 }) {
   const { month } = await searchParams;
   const monthStart = month ? parseMonthParam(month) : getMonthStart();
-  const summary = await getShoppingTripsForMonth(monthStart);
+  const [summary, listEstimate] = await Promise.all([
+    getShoppingTripsForMonth(monthStart),
+    getShoppingListCostEstimate(),
+  ]);
 
   return (
     <div>
@@ -30,7 +33,11 @@ export default async function ShoppingTrackerPage({
         accents={["amber", "lime"]}
       />
       <div className="p-4">
-        <TrackerView monthParam={formatMonthParam(monthStart)} summary={summary} />
+        <TrackerView
+          monthParam={formatMonthParam(monthStart)}
+          summary={summary}
+          listEstimate={listEstimate}
+        />
       </div>
     </div>
   );

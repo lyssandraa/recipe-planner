@@ -7,6 +7,7 @@ import { buildShoppingList } from "@/lib/shopping";
 import { formatQuantityUnit } from "@/lib/units";
 import { getPantryStockSets } from "@/lib/pantryStock";
 import { resolveIngredientId } from "@/lib/resolveIngredient";
+import { setStockLevel } from "@/app/pantry/actions";
 import { extractReceiptText } from "@/lib/import/receiptOcr";
 import { parseReceiptText } from "@/lib/import/parseReceiptText";
 
@@ -226,8 +227,21 @@ export async function setItemQuantityOverride(id: string, overrideQuantityText: 
   revalidatePath("/shopping-list");
 }
 
+// Ticking something off means you now have it, so bought closes the loop
+// back to the pantry: PLENTY, the same as manually restocking it there.
+// Never the other direction, unticking doesn't undo it, that's the pantry
+// screen's own job if someone actually used it up again already.
 export async function toggleShoppingItemChecked(id: string, checked: boolean) {
-  await prisma.shoppingListItem.update({ where: { id }, data: { checked } });
+  const item = await prisma.shoppingListItem.update({
+    where: { id },
+    data: { checked },
+    select: { ingredientId: true },
+  });
+
+  if (checked && item.ingredientId) {
+    await setStockLevel(item.ingredientId, "PLENTY");
+  }
+
   revalidatePath("/shopping-list");
 }
 
@@ -360,6 +374,61 @@ export async function getShoppingTripsForMonth(monthStart: Date): Promise<Monthl
     totalItems: trips.reduce((sum, t) => sum + t.itemCount, 0),
     predictedNextTrip,
   };
+}
+
+export type ShoppingListCostEstimate = {
+  estimatedTotal: number;
+  // How many to-buy items that estimate is actually built from, versus
+  // how many have no price history at all yet, distinct from toBuyCount
+  // (which also includes items with no ingredient link, never priceable).
+  pricedCount: number;
+  toBuyCount: number;
+};
+
+// A closer estimate than the tracker's general "recent trips" average:
+// what the list actually sitting there right now would probably cost,
+// built from each unbought item's own most recent known price, not
+// everyone's shopping averaged together.
+export async function getShoppingListCostEstimate(): Promise<ShoppingListCostEstimate> {
+  const toBuy = await prisma.shoppingListItem.findMany({
+    where: { checked: false },
+    select: { ingredientId: true },
+  });
+  const toBuyCount = toBuy.length;
+  const ingredientIds = Array.from(
+    new Set(toBuy.map((i) => i.ingredientId).filter((id): id is string => id != null))
+  );
+
+  if (ingredientIds.length === 0) {
+    return { estimatedTotal: 0, pricedCount: 0, toBuyCount };
+  }
+
+  // Ordered by the owning trip's date, most recent first, so the first
+  // row seen per ingredient below is that ingredient's latest known price.
+  const priceRows = await prisma.shoppingTripItem.findMany({
+    where: { ingredientId: { in: ingredientIds }, price: { not: null } },
+    orderBy: { trip: { date: "desc" } },
+    select: { ingredientId: true, price: true },
+  });
+
+  const latestPriceByIngredient = new Map<string, number>();
+  for (const row of priceRows) {
+    if (!latestPriceByIngredient.has(row.ingredientId!)) {
+      latestPriceByIngredient.set(row.ingredientId!, row.price!);
+    }
+  }
+
+  let estimatedTotal = 0;
+  let pricedCount = 0;
+  for (const id of ingredientIds) {
+    const price = latestPriceByIngredient.get(id);
+    if (price != null) {
+      estimatedTotal += price;
+      pricedCount++;
+    }
+  }
+
+  return { estimatedTotal, pricedCount, toBuyCount };
 }
 
 export type TripItemInput = {

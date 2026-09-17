@@ -28,6 +28,7 @@ import {
   deleteShoppingTrip,
   type MonthlyShoppingSummary,
   type ShoppingTripData,
+  type ShoppingListCostEstimate,
 } from "../actions";
 import TripItemEditor, { nextTripItemKey, type EditableTripItem } from "./trip-item-editor";
 
@@ -39,9 +40,11 @@ function todayParam(): string {
 export default function TrackerView({
   monthParam,
   summary,
+  listEstimate,
 }: {
   monthParam: string;
   summary: MonthlyShoppingSummary;
+  listEstimate: ShoppingListCostEstimate;
 }) {
   const [openTripId, setOpenTripId] = useState<string | null>(null);
   // null while adding a brand new trip, an id while editing an existing
@@ -195,15 +198,27 @@ export default function TrackerView({
         <StatsStrip cells={cells} />
       </div>
 
-      {summary.predictedNextTrip != null && (
+      {listEstimate.pricedCount > 0 ? (
         <div className="flex items-center gap-2.5 rounded-2xl bg-amber-tint px-4 py-3">
           <IconSparkles size={18} stroke={1.75} className="shrink-0 text-amber-text" />
           <p className="text-sm text-amber-text">
-            Your next shop will probably cost around{" "}
-            <span className="font-semibold">{formatGBP(summary.predictedNextTrip)}</span>, based
-            on recent priced trips.
+            Your current shopping list would cost around{" "}
+            <span className="font-semibold">{formatGBP(listEstimate.estimatedTotal)}</span>,
+            based on {listEstimate.pricedCount} of {listEstimate.toBuyCount} item
+            {listEstimate.toBuyCount === 1 ? "" : "s"} with a known price.
           </p>
         </div>
+      ) : (
+        summary.predictedNextTrip != null && (
+          <div className="flex items-center gap-2.5 rounded-2xl bg-amber-tint px-4 py-3">
+            <IconSparkles size={18} stroke={1.75} className="shrink-0 text-amber-text" />
+            <p className="text-sm text-amber-text">
+              Your next shop will probably cost around{" "}
+              <span className="font-semibold">{formatGBP(summary.predictedNextTrip)}</span>,
+              based on recent priced trips.
+            </p>
+          </div>
+        )
       )}
 
       <div className="flex gap-2">
