@@ -7,6 +7,8 @@ import { buildShoppingList } from "@/lib/shopping";
 import { formatQuantityUnit } from "@/lib/units";
 import { getPantryStockSets } from "@/lib/pantryStock";
 import { resolveIngredientId } from "@/lib/resolveIngredient";
+import { extractReceiptText } from "@/lib/import/receiptOcr";
+import { parseReceiptText } from "@/lib/import/parseReceiptText";
 
 export type ShoppingListItemData = {
   id: string;
@@ -396,6 +398,39 @@ export async function saveShoppingTrip(input: {
     },
   });
   revalidatePath("/shopping-list/tracker");
+}
+
+export type ReceiptScanResult = {
+  totalSpent: number | null;
+  items: TripItemInput[];
+};
+
+// OCRs a receipt photo and runs the result through the same trailing-price
+// line heuristic every receipt-clipper tool relies on. Nothing is saved
+// here, this only returns a draft for the same review editor manual entry
+// uses, saveShoppingTrip does the actual write once it's confirmed.
+export async function parseReceiptImage(formData: FormData): Promise<ReceiptScanResult> {
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("No file provided.");
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const text = await extractReceiptText(buffer);
+  const parsed = parseReceiptText(text);
+
+  if (parsed.items.length === 0) {
+    throw new Error(
+      "Couldn't find any priced items on that receipt. A clearer, flatter photo often helps, or add items by hand."
+    );
+  }
+
+  return {
+    totalSpent: parsed.totalSpent,
+    items: parsed.items.map((i) => ({
+      name: i.name,
+      quantityText: i.quantityText,
+      price: i.price,
+    })),
+  };
 }
 
 export async function updateShoppingTrip(id: string, totalSpent: number | null) {

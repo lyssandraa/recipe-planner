@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,6 +9,7 @@ import {
   IconChevronRight,
   IconPencil,
   IconPlus,
+  IconReceipt,
   IconSparkles,
   IconTrash,
   IconX,
@@ -21,11 +22,12 @@ import { addMonths, formatMonthLabel, formatMonthParam, parseMonthParam } from "
 import { formatGBP } from "@/lib/currency";
 import {
   saveShoppingTrip,
+  parseReceiptImage,
   updateShoppingTrip,
   deleteShoppingTrip,
   type MonthlyShoppingSummary,
 } from "../actions";
-import TripItemEditor, { type EditableTripItem } from "./trip-item-editor";
+import TripItemEditor, { nextTripItemKey, type EditableTripItem } from "./trip-item-editor";
 
 function todayParam(): string {
   const d = new Date();
@@ -46,6 +48,10 @@ export default function TrackerView({
   const [newDate, setNewDate] = useState(todayParam());
   const [newAmount, setNewAmount] = useState("");
   const [newItems, setNewItems] = useState<EditableTripItem[]>([]);
+  const [fromScan, setFromScan] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -94,7 +100,42 @@ export default function TrackerView({
     setNewDate(todayParam());
     setNewAmount("");
     setNewItems([]);
+    setFromScan(false);
+    setScanError(null);
     setAdding(true);
+  }
+
+  // The file input's change handler, not a separate "scan" button: tapping
+  // "Scan receipt" opens the camera directly (capture="environment"), and
+  // OCR runs the moment a photo comes back, landing on the same add-expense
+  // review panel manual entry uses, pre-filled instead of blank.
+  function handleReceiptFile(file: File) {
+    setScanError(null);
+    setScanning(true);
+    startTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("file", file);
+        const result = await parseReceiptImage(formData);
+        setNewDate(todayParam());
+        setNewAmount(result.totalSpent != null ? String(result.totalSpent) : "");
+        setNewItems(
+          result.items.map((i) => ({
+            key: nextTripItemKey(),
+            name: i.name,
+            quantityText: i.quantityText ?? "",
+            price: i.price != null ? String(i.price) : "",
+          }))
+        );
+        setFromScan(true);
+        setAdding(true);
+      } catch (e) {
+        setScanError(e instanceof Error ? e.message : "Couldn't read that receipt.");
+      } finally {
+        setScanning(false);
+        if (receiptInputRef.current) receiptInputRef.current.value = "";
+      }
+    });
   }
 
   function handleAddExpense() {
@@ -153,14 +194,37 @@ export default function TrackerView({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={openAdd}
-        className="flex items-center justify-center gap-2 rounded-[12px] border-2 border-green-deep px-4 py-2.5 text-sm font-medium text-green-deep"
-      >
-        <IconPlus size={16} stroke={2} />
-        Add expense
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={openAdd}
+          className="flex flex-1 items-center justify-center gap-2 rounded-[12px] border-2 border-green-deep px-4 py-2.5 text-sm font-medium text-green-deep"
+        >
+          <IconPlus size={16} stroke={2} />
+          Add expense
+        </button>
+        <button
+          type="button"
+          disabled={scanning}
+          onClick={() => receiptInputRef.current?.click()}
+          className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        >
+          <IconReceipt size={16} stroke={1.75} />
+          {scanning ? "Reading…" : "Scan receipt"}
+        </button>
+        <input
+          ref={receiptInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleReceiptFile(file);
+          }}
+        />
+      </div>
+      {scanError && <p className="text-sm text-terracotta-text">{scanError}</p>}
 
       {summary.trips.length === 0 ? (
         <EmptyState
@@ -286,7 +350,9 @@ export default function TrackerView({
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/30 p-4">
           <div className="flex max-h-[85vh] w-full max-w-[380px] flex-col rounded-2xl bg-card shadow-lg">
             <div className="flex items-center justify-between p-4 pb-2">
-              <h2 className="text-sm font-semibold text-ink">Add expense</h2>
+              <h2 className="text-sm font-semibold text-ink">
+                {fromScan ? "Review scanned receipt" : "Add expense"}
+              </h2>
               <button
                 type="button"
                 onClick={() => setAdding(false)}
@@ -319,7 +385,9 @@ export default function TrackerView({
                 </label>
               </div>
               <p className="mt-3 mb-1.5 text-xs font-medium text-ink-soft">
-                Items (optional, for price history)
+                {fromScan
+                  ? "Double check these, local OCR isn't perfect, fix or remove anything wrong."
+                  : "Items (optional, for price history)"}
               </p>
               <TripItemEditor items={newItems} onChange={setNewItems} />
             </div>
