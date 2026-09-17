@@ -14,13 +14,14 @@ const nextConfig: NextConfig = {
   // native require resolves it normally instead.
   serverExternalPackages: ["tesseract.js"],
   // Default Server Action body limit is 1MB, far smaller than a real
-  // phone camera photo (the actual crash: "Body exceeded 1 MB limit",
-  // a 413 from Next itself, not a tesseract.js or timeout problem at
-  // all). Covers both the receipt scanner and the PDF recipe importer,
-  // both send a File through a Server Action.
+  // phone camera photo. Raising it only helps up to a point though:
+  // Vercel's serverless functions have their own hard, non-configurable
+  // 4.5MB request body limit below this, so kept under that deliberately
+  // (the receipt scanner now compresses the photo client-side first, see
+  // lib/compressImage.ts, this is just a graceful backstop, not the fix).
   experimental: {
     serverActions: {
-      bodySizeLimit: "15mb",
+      bodySizeLimit: "4mb",
     },
   },
 };

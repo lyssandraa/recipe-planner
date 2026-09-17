@@ -20,6 +20,7 @@ import { useToast } from "@/app/components/toast-provider";
 import { useEscapeToClose } from "@/lib/useEscapeToClose";
 import { addMonths, formatMonthLabel, formatMonthParam, parseMonthParam } from "@/lib/month";
 import { formatGBP } from "@/lib/currency";
+import { compressImageFile } from "@/lib/compressImage";
 import {
   saveShoppingTrip,
   parseReceiptImage,
@@ -114,8 +115,9 @@ export default function TrackerView({
     setScanning(true);
     startTransition(async () => {
       try {
+        const compressed = await compressImageFile(file);
         const formData = new FormData();
-        formData.set("file", file);
+        formData.set("file", compressed);
         const result = await parseReceiptImage(formData);
         setNewDate(todayParam());
         setNewAmount(result.totalSpent != null ? String(result.totalSpent) : "");
