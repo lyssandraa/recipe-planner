@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
   // serverless output), this opts it out of bundling entirely so Node's
   // native require resolves it normally instead.
   serverExternalPackages: ["tesseract.js"],
+  // Default Server Action body limit is 1MB, far smaller than a real
+  // phone camera photo (the actual crash: "Body exceeded 1 MB limit",
+  // a 413 from Next itself, not a tesseract.js or timeout problem at
+  // all). Covers both the receipt scanner and the PDF recipe importer,
+  // both send a File through a Server Action.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "15mb",
+    },
+  },
 };
 
 export default nextConfig;
