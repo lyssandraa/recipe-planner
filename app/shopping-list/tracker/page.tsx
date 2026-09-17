@@ -5,6 +5,12 @@ import { getShoppingTripsForMonth } from "../actions";
 import TrackerView from "./tracker-view";
 
 export const dynamic = "force-dynamic";
+// Sets the timeout for every Server Action used on this page, including
+// parseReceiptImage. A cold Tesseract worker (downloading the OCR engine
+// and language model from CDN, then actually recognising the image) can
+// easily exceed a platform's default ~10s function timeout, especially on
+// the first request after a deploy or idle period.
+export const maxDuration = 60;
 
 export default async function ShoppingTrackerPage({
   searchParams,
