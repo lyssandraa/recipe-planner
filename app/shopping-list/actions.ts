@@ -228,6 +228,18 @@ export async function toggleShoppingItemChecked(id: string, checked: boolean) {
   revalidatePath("/shopping-list");
 }
 
+// Removes a single row outright, whether it's still to-buy or already
+// ticked, no need to check something off first just to get rid of it.
+// A recipe-derived row deleted this way comes back on the next sync while
+// its recipe is still selected, that's an intentional resync, not a bug,
+// deleting a want-it-gone-for-good item means also dropping the recipe
+// selection or the pantry's low-stock flag that's generating it.
+export async function deleteShoppingItem(id: string): Promise<ShoppingListItemData[]> {
+  await prisma.shoppingListItem.delete({ where: { id } });
+  revalidatePath("/shopping-list");
+  return getShoppingListItems();
+}
+
 // Logs a ShoppingTrip snapshot before deleting, so the monthly tracker has
 // something to look back on even though the list rows themselves don't
 // survive being bought. totalSpent is optional, a trip is still worth
@@ -294,6 +306,42 @@ export async function getShoppingTripsForMonth(monthStart: Date): Promise<Monthl
     tripsWithSpend: priced.length,
     totalItems: trips.reduce((sum, t) => sum + t.itemCount, 0),
   };
+}
+
+// A trip logged directly from the tracker, not from clearing the trolley,
+// for a shop that never went through the list at all (a corner shop run,
+// a market stall) or one from before this feature existed. note is a free
+// comma-separated list, split the same shape as itemNames so it renders
+// the same way, empty is fine, an expense doesn't have to name items.
+export async function addManualShoppingTrip(input: {
+  date: string;
+  totalSpent: number | null;
+  note: string;
+}) {
+  const itemNames = input.note
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  await prisma.shoppingTrip.create({
+    data: {
+      date: new Date(`${input.date}T12:00:00`),
+      totalSpent: input.totalSpent,
+      itemCount: itemNames.length,
+      itemNames,
+    },
+  });
+  revalidatePath("/shopping-list/tracker");
+}
+
+export async function updateShoppingTrip(id: string, totalSpent: number | null) {
+  await prisma.shoppingTrip.update({ where: { id }, data: { totalSpent } });
+  revalidatePath("/shopping-list/tracker");
+}
+
+export async function deleteShoppingTrip(id: string) {
+  await prisma.shoppingTrip.delete({ where: { id } });
+  revalidatePath("/shopping-list/tracker");
 }
 
 // Used by the planner's "send this week's missing ingredients" action.

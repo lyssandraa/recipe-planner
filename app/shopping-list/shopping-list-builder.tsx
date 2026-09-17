@@ -8,6 +8,7 @@ import {
   IconChevronDown,
   IconClockExclamation,
   IconPlus,
+  IconTrash,
   IconX,
 } from "@tabler/icons-react";
 import EmptyState from "@/app/components/empty-state";
@@ -19,6 +20,7 @@ import {
   syncShoppingList,
   addManualItem,
   toggleShoppingItemChecked,
+  deleteShoppingItem,
   clearTickedItems,
   promoteLowStockItem,
   reorderShoppingItems,
@@ -89,6 +91,14 @@ export default function ShoppingListBuilder({
     startTransition(() => {
       toggleShoppingItemChecked(item.id, nextChecked);
     });
+  }
+
+  function handleDelete(item: ShoppingListItemData) {
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    startTransition(async () => {
+      await deleteShoppingItem(item.id);
+    });
+    toast(`Removed "${item.name}"`);
   }
 
   // Moves an item one place within its category group, swapping it with
@@ -237,6 +247,7 @@ export default function ShoppingListBuilder({
                         )
                       )
                     }
+                    onDelete={() => handleDelete(item)}
                     canMoveUp={i > 0}
                     canMoveDown={i < group.items.length - 1}
                     onMoveUp={() => moveItem(item, group.items, "up")}
@@ -349,6 +360,14 @@ export default function ShoppingListBuilder({
                   <span className="flex-1 text-sm text-ink-soft line-through">
                     {item.name}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item)}
+                    aria-label="Delete"
+                    className="shrink-0 text-ink-soft"
+                  >
+                    <IconTrash size={15} stroke={1.75} />
+                  </button>
                 </li>
               ))}
             </ul>

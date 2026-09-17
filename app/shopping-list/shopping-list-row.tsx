@@ -8,6 +8,7 @@ import {
   IconChevronUp,
   IconPencil,
   IconToolsKitchen2,
+  IconTrash,
 } from "@tabler/icons-react";
 import { setItemQuantityOverride, type ShoppingListItemData } from "./actions";
 import { useEscapeToClose } from "@/lib/useEscapeToClose";
@@ -28,6 +29,7 @@ export default function ShoppingListRow({
   item,
   onToggleChecked,
   onOverrideChange,
+  onDelete,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -36,6 +38,7 @@ export default function ShoppingListRow({
   item: ShoppingListItemData;
   onToggleChecked: () => void;
   onOverrideChange: (value: string | null) => void;
+  onDelete: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -128,6 +131,14 @@ export default function ShoppingListRow({
         </button>
 
         <OriginIcon origin={item.origin} />
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label="Delete"
+          className="shrink-0 text-ink-soft"
+        >
+          <IconTrash size={15} stroke={1.75} />
+        </button>
       </div>
 
       {editing && (
