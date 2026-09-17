@@ -433,8 +433,38 @@ export async function parseReceiptImage(formData: FormData): Promise<ReceiptScan
   };
 }
 
-export async function updateShoppingTrip(id: string, totalSpent: number | null) {
-  await prisma.shoppingTrip.update({ where: { id }, data: { totalSpent } });
+// Replaces a trip's date, total and full item list in one go, the same
+// shape saveShoppingTrip creates one with. Items are deleted and
+// recreated rather than diffed/matched against their old rows, simplest
+// correct option given the editor already hands back the full intended
+// list each time, not just what changed.
+export async function updateShoppingTrip(
+  id: string,
+  input: { date: string; totalSpent: number | null; items: TripItemInput[] }
+) {
+  const items = await Promise.all(
+    input.items
+      .filter((i) => i.name.trim())
+      .map(async (i) => ({
+        name: i.name.trim(),
+        quantityText: i.quantityText?.trim() || null,
+        price: i.price,
+        ingredientId: await resolveIngredientId(i.name),
+      }))
+  );
+
+  await prisma.shoppingTrip.update({
+    where: { id },
+    data: {
+      date: new Date(`${input.date}T12:00:00`),
+      totalSpent: input.totalSpent,
+      itemCount: items.length,
+      items: {
+        deleteMany: {},
+        create: items,
+      },
+    },
+  });
   revalidatePath("/shopping-list/tracker");
 }
 

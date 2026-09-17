@@ -27,6 +27,7 @@ import {
   updateShoppingTrip,
   deleteShoppingTrip,
   type MonthlyShoppingSummary,
+  type ShoppingTripData,
 } from "../actions";
 import TripItemEditor, { nextTripItemKey, type EditableTripItem } from "./trip-item-editor";
 
@@ -43,8 +44,10 @@ export default function TrackerView({
   summary: MonthlyShoppingSummary;
 }) {
   const [openTripId, setOpenTripId] = useState<string | null>(null);
+  // null while adding a brand new trip, an id while editing an existing
+  // one, both share the same modal/editor below rather than two separate
+  // UIs for what's otherwise the same date/amount/items shape.
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
-  const [editAmount, setEditAmount] = useState("");
   const [adding, setAdding] = useState(false);
   const [newDate, setNewDate] = useState(todayParam());
   const [newAmount, setNewAmount] = useState("");
@@ -72,20 +75,21 @@ export default function TrackerView({
     { value: summary.totalItems, label: "items" },
   ];
 
-  function openEdit(tripId: string, currentAmount: number | null) {
-    setEditingTripId(tripId);
-    setEditAmount(currentAmount != null ? String(currentAmount) : "");
-  }
-
-  function handleSaveEdit(tripId: string) {
-    const trimmed = editAmount.trim();
-    const amount = trimmed ? Number(trimmed) : null;
-    startTransition(async () => {
-      await updateShoppingTrip(tripId, amount != null && !Number.isNaN(amount) ? amount : null);
-      setEditingTripId(null);
-      toast("Updated");
-      router.refresh();
-    });
+  function openEditTrip(trip: ShoppingTripData) {
+    setEditingTripId(trip.id);
+    setFromScan(false);
+    setScanError(null);
+    setNewDate(trip.date.slice(0, 10));
+    setNewAmount(trip.totalSpent != null ? String(trip.totalSpent) : "");
+    setNewItems(
+      trip.items.map((i) => ({
+        key: nextTripItemKey(),
+        name: i.name,
+        quantityText: i.quantityText ?? "",
+        price: i.price != null ? String(i.price) : "",
+      }))
+    );
+    setAdding(true);
   }
 
   function handleDeleteTrip(tripId: string) {
@@ -98,6 +102,7 @@ export default function TrackerView({
   }
 
   function openAdd() {
+    setEditingTripId(null);
     setNewDate(todayParam());
     setNewAmount("");
     setNewItems([]);
@@ -119,6 +124,7 @@ export default function TrackerView({
         const formData = new FormData();
         formData.set("file", compressed);
         const result = await parseReceiptImage(formData);
+        setEditingTripId(null);
         setNewDate(todayParam());
         setNewAmount(result.totalSpent != null ? String(result.totalSpent) : "");
         setNewItems(
@@ -140,23 +146,27 @@ export default function TrackerView({
     });
   }
 
-  function handleAddExpense() {
+  function handleSaveTrip() {
     const trimmed = newAmount.trim();
     const amount = trimmed ? Number(trimmed) : null;
+    const items = newItems
+      .filter((i) => i.name.trim())
+      .map((i) => ({
+        name: i.name,
+        quantityText: i.quantityText || null,
+        price: i.price.trim() ? Number(i.price) : null,
+      }));
+    const totalSpent = amount != null && !Number.isNaN(amount) ? amount : null;
+
     startTransition(async () => {
-      await saveShoppingTrip({
-        date: newDate,
-        totalSpent: amount != null && !Number.isNaN(amount) ? amount : null,
-        items: newItems
-          .filter((i) => i.name.trim())
-          .map((i) => ({
-            name: i.name,
-            quantityText: i.quantityText || null,
-            price: i.price.trim() ? Number(i.price) : null,
-          })),
-      });
+      if (editingTripId) {
+        await updateShoppingTrip(editingTripId, { date: newDate, totalSpent, items });
+        toast("Trip updated");
+      } else {
+        await saveShoppingTrip({ date: newDate, totalSpent, items });
+        toast("Expense added");
+      }
       setAdding(false);
-      toast("Expense added");
       router.refresh();
     });
   }
@@ -238,7 +248,6 @@ export default function TrackerView({
         <ul className="flex flex-col gap-2">
           {summary.trips.map((trip) => {
             const open = openTripId === trip.id;
-            const editing = editingTripId === trip.id;
             const date = new Date(trip.date);
             return (
               <li key={trip.id} className="overflow-hidden rounded-2xl bg-card shadow-sm">
@@ -287,59 +296,25 @@ export default function TrackerView({
                         ))}
                       </ul>
                     )}
-                    {editing ? (
-                      <div className="flex items-center gap-2">
-                        <label className="flex flex-1 items-center gap-2 rounded-[12px] border border-border-soft px-3 py-2">
-                          <span className="text-sm text-ink-soft">£</span>
-                          <input
-                            autoFocus
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            value={editAmount}
-                            onChange={(e) => setEditAmount(e.target.value)}
-                            className="w-full border-none bg-transparent text-sm text-ink focus:outline-none"
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleSaveEdit(trip.id)}
-                          className="rounded-[12px] bg-green-deep px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingTripId(null)}
-                          aria-label="Cancel"
-                          className="text-ink-soft"
-                        >
-                          <IconX size={16} stroke={2} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-4">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(trip.id, trip.totalSpent)}
-                          className="flex items-center gap-1.5 text-xs font-medium text-green-deep"
-                        >
-                          <IconPencil size={14} stroke={1.75} />
-                          Edit amount
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleDeleteTrip(trip.id)}
-                          className="flex items-center gap-1.5 text-xs font-medium text-terracotta-text disabled:opacity-50"
-                        >
-                          <IconTrash size={14} stroke={1.75} />
-                          Delete
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => openEditTrip(trip)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-green-deep"
+                      >
+                        <IconPencil size={14} stroke={1.75} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleDeleteTrip(trip.id)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-terracotta-text disabled:opacity-50"
+                      >
+                        <IconTrash size={14} stroke={1.75} />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 )}
               </li>
@@ -353,7 +328,7 @@ export default function TrackerView({
           <div className="flex max-h-[85vh] w-full max-w-[380px] flex-col rounded-2xl bg-card shadow-lg">
             <div className="flex items-center justify-between p-4 pb-2">
               <h2 className="text-sm font-semibold text-ink">
-                {fromScan ? "Review scanned receipt" : "Add expense"}
+                {fromScan ? "Review scanned receipt" : editingTripId ? "Edit trip" : "Add expense"}
               </h2>
               <button
                 type="button"
@@ -397,10 +372,10 @@ export default function TrackerView({
               <button
                 type="button"
                 disabled={isPending}
-                onClick={handleAddExpense}
+                onClick={handleSaveTrip}
                 className="w-full rounded-[12px] bg-green-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
               >
-                {isPending ? "Adding…" : "Add expense"}
+                {isPending ? "Saving…" : editingTripId ? "Save changes" : "Add expense"}
               </button>
             </div>
           </div>
