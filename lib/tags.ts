@@ -29,7 +29,7 @@ export const CUISINE_LABELS: Record<Cuisine, string> = {
   ITALIAN: "Italian",
   FRENCH: "French",
   GREEK: "Greek",
-  MIDDLE_EASTERN: "Middle Eastern",
+  MIDDLE_EASTERN: "West Asian",
   PERSIAN: "Persian",
   NORTH_AFRICAN: "North African",
   INDIAN: "Indian",
