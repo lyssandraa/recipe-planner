@@ -1,0 +1,3 @@
+-- Adds PERSIAN to the Cuisine enum. Cuisine values are stored as TEXT in
+-- the RecipeCuisine join table on SQLite, so a new enum member needs no DDL,
+-- this file only keeps migration history in sync with schema.prisma.
