@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recipe Planner
 
-## Getting Started
+A personal kitchen app that ties recipes, pantry stock, meal planning and grocery shopping together, so the answer to "what's for dinner?" comes from what's actually in the cupboard.
 
-First, run the development server:
+Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript** and **Prisma**, deployed on **Vercel** with a **Turso** (libSQL) database. Installable as a PWA.
+
+## Features
+
+- **Recipe import**: paste a URL (parses schema.org JSON-LD), paste plain text, or upload a PDF. A hand-written parser handles ingredient lines, quantities, units and durations, with no AI involved.
+- **Pantry tracking** with stock levels and per-ingredient storage advice
+- **"What can I make?"**: matches recipes against the pantry, including sensible substitutions (e.g. unsalted butter for butter)
+- **Daily suggestions** that favour ingredients running low and add variety across the week
+- **Meal planner** with a weekly view and serving scaling
+- **Shopping list** grouped by store category, generated from the plan and pantry gaps
+- **Receipt scanning**: photograph a receipt and OCR (tesseract.js, runs locally, free) logs the trip and per-item prices for cost tracking and estimates
+- **Barcode scanning**: pulls product nutrition and ingredients from the Open Food Facts API
+- **Cook mode** with step-by-step instructions, and a cook log
+- **Backup and restore** of all data to a portable JSON file
+
+## Tech notes
+
+- Server Actions for mutations, with no separate API layer
+- Prisma with the libSQL driver adapter (SQLite locally, Turso in production)
+- Image compression on the client before upload to stay within serverless body limits
+- Backups reference entities by stable natural keys (names, barcodes) instead of database IDs, so they restore cleanly into a fresh database
+
+## Running locally
 
 ```bash
+npm install
+npx prisma migrate dev
+npm run db:seed     # optional sample data
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Environment variables (`.env`):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | `file:./prisma/dev.db` locally, or a `libsql://` Turso URL |
+| `TURSO_AUTH_TOKEN` | Turso auth token (production only) |
