@@ -6,7 +6,6 @@ import { getEffortLabel, type EffortLabel } from "@/lib/effort";
 import { getMissingIngredients, getRequiredIngredients } from "@/lib/matching";
 import { getPantryStockSets } from "@/lib/pantryStock";
 import { planWeek, pickForSlot, type PlannerRecipe, type PlannerSlotInput } from "@/lib/planner";
-import { addDays } from "@/lib/week";
 import { addRecipesToShoppingList } from "@/app/shopping-list/actions";
 import { requireAuth } from "@/lib/auth";
 
@@ -105,25 +104,6 @@ async function getAllDinnerRecipesById() {
 
 function dayIndexFromDate(startDate: Date, date: Date): number {
   return Math.round((date.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
-}
-
-// Finds this week's plan if it exists, otherwise creates it with 7 empty
-// entries, Monday first. startDate must already be local midnight (see
-// lib/week.ts's parseWeekStartParam / getWeekStart), so the same calendar
-// week always resolves to the same plan.
-export async function getOrCreatePlanId(startDate: Date): Promise<string> {
-  const existing = await prisma.mealPlan.findUnique({ where: { startDate } });
-  if (existing) return existing.id;
-
-  const plan = await prisma.mealPlan.create({
-    data: {
-      startDate,
-      entries: {
-        create: Array.from({ length: 7 }, (_, i) => ({ date: addDays(startDate, i) })),
-      },
-    },
-  });
-  return plan.id;
 }
 
 // Fills every non-pinned slot for the week. Pass targets to change and

@@ -6,7 +6,9 @@ import { getPantryStockSets } from "@/lib/pantryStock";
 import { getCardColorClass, getRecipeEmoji } from "@/lib/recipeVisuals";
 import { getWeekStart, formatDayLabel, formatWeekRange, parseWeekStartParam, formatWeekStartParam } from "@/lib/week";
 import PageHeader from "@/app/components/page-header";
-import { getOrCreatePlanId } from "./actions";
+import { redirect } from "next/navigation";
+import { findPlanId, getOrCreatePlanId } from "@/lib/mealPlan";
+import { isAuthenticated } from "@/lib/auth";
 import PlannerView, { type PlannerSlotData } from "./planner-view";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,16 @@ export default async function PlannerPage({
 }) {
   const { week } = await searchParams;
   const weekStart = week ? parseWeekStartParam(week) : getWeekStart();
-  const planId = await getOrCreatePlanId(weekStart);
+
+  // The planner is publicly viewable, but only a signed-in visitor may
+  // create plans for arbitrary weeks; anyone else can see existing weeks
+  // and the current one (created at most once per week).
+  const isCurrentWeek = weekStart.getTime() === getWeekStart().getTime();
+  let planId = await findPlanId(weekStart);
+  if (!planId) {
+    if (!isCurrentWeek && !(await isAuthenticated())) redirect("/planner");
+    planId = await getOrCreatePlanId(weekStart);
+  }
 
   const [plan, { wellStocked, lowOrOut }, dinnerOptions] = await Promise.all([
     prisma.mealPlan.findUniqueOrThrow({
