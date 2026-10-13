@@ -15,6 +15,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { serializeInstructions, type RecipeStep } from "@/lib/instructions";
 import { guessCategory } from "@/lib/guessCategory";
+import { requireAuth } from "@/lib/auth";
 
 export type RecipeIngredientInput = {
   ingredientId: string;
@@ -51,6 +52,7 @@ export type RecipeFormInput = {
 };
 
 export async function createIngredient(name: string, category?: IngredientCategory) {
+  await requireAuth();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Ingredient name is required.");
   const ingredient = await prisma.ingredient.create({
@@ -79,6 +81,7 @@ function tagAndComponentCreateData(input: RecipeFormInput) {
 }
 
 export async function createRecipe(input: RecipeFormInput) {
+  await requireAuth();
   const recipe = await prisma.recipe.create({
     data: {
       title: input.title,
@@ -112,6 +115,7 @@ export async function createRecipe(input: RecipeFormInput) {
 }
 
 export async function updateRecipe(id: string, input: RecipeFormInput) {
+  await requireAuth();
   await prisma.$transaction([
     prisma.recipeIngredient.deleteMany({ where: { recipeId: id } }),
     prisma.recipeCuisine.deleteMany({ where: { recipeId: id } }),
@@ -155,6 +159,7 @@ export async function updateRecipe(id: string, input: RecipeFormInput) {
 }
 
 export async function deleteRecipe(id: string) {
+  await requireAuth();
   await prisma.recipe.delete({ where: { id } });
   revalidatePath("/recipes");
   revalidatePath("/what-can-i-make");
@@ -162,6 +167,7 @@ export async function deleteRecipe(id: string) {
 }
 
 export async function logCooked(recipeId: string) {
+  await requireAuth();
   const entry = await prisma.cookLog.create({ data: { recipeId } });
   revalidatePath(`/recipes/${recipeId}`);
   return entry;

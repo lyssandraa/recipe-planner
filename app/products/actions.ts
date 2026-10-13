@@ -8,6 +8,7 @@ import { parseIngredientLine, parseIngredientsText } from "@/lib/productIngredie
 import { resolveIngredientId } from "@/lib/resolveIngredient";
 import { matchClaims } from "@/lib/claims";
 import { guessCategory } from "@/lib/guessCategory";
+import { requireAuth } from "@/lib/auth";
 
 type BuiltIngredientRow = {
   position: number;
@@ -193,6 +194,7 @@ export type ManualProductInput = {
 };
 
 export async function createManualProduct(input: ManualProductInput) {
+  await requireAuth();
   const rows = await buildProductIngredientRows(input.rawIngredientsText, null);
   const claims = matchClaims({ labelsTags: [], name: input.name });
 
@@ -240,6 +242,7 @@ export type AddToPantryResult =
 // and marks that as present. Scanning a jar of rice means "I have rice,
 // specifically this jar", not "I have every ingredient printed on its label."
 export async function addProductToPantry(productId: string): Promise<AddToPantryResult> {
+  await requireAuth();
   const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
 
   const ingredientId = await resolveIngredientId(product.name);
@@ -270,6 +273,7 @@ export async function createIngredientAndAddToPantry(
   name: string,
   category: IngredientCategory
 ): Promise<AddToPantryResult> {
+  await requireAuth();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Ingredient name is required.");
 
@@ -296,6 +300,7 @@ export async function createIngredientAndAddToPantry(
 // manufacturingPlace and soldIn for display, and is preserved across future
 // rescans rather than getting overwritten by fresh API data.
 export async function setOriginOverride(productId: string, value: string | null) {
+  await requireAuth();
   await prisma.product.update({
     where: { id: productId },
     data: { originOverride: value?.trim() || null },
@@ -307,6 +312,7 @@ export async function saveIngredientInfo(
   ingredientId: string,
   input: { functionLabel: string | null; plainEnglish: string | null }
 ) {
+  await requireAuth();
   await prisma.ingredientInfo.upsert({
     where: { ingredientId },
     update: {
@@ -330,6 +336,7 @@ export async function addManualClaim(
   claimType: ClaimType,
   explanation: string | null
 ) {
+  await requireAuth();
   const trimmedText = claimText.trim();
   const trimmedExplanation = explanation?.trim() || null;
   if (!trimmedText) throw new Error("Claim text is required.");

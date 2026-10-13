@@ -10,6 +10,7 @@ import { resolveIngredientId } from "@/lib/resolveIngredient";
 import { setStockLevel } from "@/app/pantry/actions";
 import { extractReceiptText } from "@/lib/import/receiptOcr";
 import { parseReceiptText } from "@/lib/import/parseReceiptText";
+import { requireAuth } from "@/lib/auth";
 
 export type ShoppingListItemData = {
   id: string;
@@ -38,6 +39,7 @@ export type MightNeedSoonItem = {
 };
 
 export async function getShoppingListItems(): Promise<ShoppingListItemData[]> {
+  await requireAuth();
   const rows = await prisma.shoppingListItem.findMany({
     orderBy: [{ checked: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     include: { ingredient: { select: { category: true } } },
@@ -59,6 +61,7 @@ export async function getShoppingListItems(): Promise<ShoppingListItemData[]> {
 // Read live from pantry state rather than stored, since nothing needs to
 // persist until it's actually promoted.
 export async function getMightNeedSoon(): Promise<MightNeedSoonItem[]> {
+  await requireAuth();
   const [lowItems, listedIngredientIds] = await Promise.all([
     prisma.pantryItem.findMany({
       where: { stockLevel: "LOW" },
@@ -79,6 +82,7 @@ export async function getMightNeedSoon(): Promise<MightNeedSoonItem[]> {
 }
 
 export async function promoteLowStockItem(ingredientId: string): Promise<ShoppingListItemData[]> {
+  await requireAuth();
   const ingredient = await prisma.ingredient.findUniqueOrThrow({ where: { id: ingredientId } });
   await prisma.shoppingListItem.upsert({
     where: { ingredientId_origin: { ingredientId, origin: "LOW_STOCK" } },
@@ -148,6 +152,7 @@ async function mergeMissingIngredients(recipeIds: string[]) {
 export async function syncShoppingList(
   selectedRecipeIds: string[]
 ): Promise<ShoppingListItemData[]> {
+  await requireAuth();
   const merged = await mergeMissingIngredients(selectedRecipeIds);
   const mergedIds = new Set(merged.map((m) => m.ingredientId));
 
@@ -189,6 +194,7 @@ export async function syncShoppingList(
 }
 
 export async function addManualItem(name: string, quantityText: string | null) {
+  await requireAuth();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Name is required.");
 
@@ -208,6 +214,7 @@ export async function addManualItem(name: string, quantityText: string | null) {
 // Persists a new manual order for a category group of to-buy items as
 // sequential integers, mirroring the pantry's reorderIngredients.
 export async function reorderShoppingItems(orderedIds: string[]) {
+  await requireAuth();
   await prisma.$transaction(
     orderedIds.map((id, index) =>
       prisma.shoppingListItem.update({ where: { id }, data: { sortOrder: index } })
@@ -220,6 +227,7 @@ export async function reorderShoppingItems(orderedIds: string[]) {
 // recipe-derived quantityText underneath. Passing null clears the override,
 // reverting to whatever quantityText currently computes to.
 export async function setItemQuantityOverride(id: string, overrideQuantityText: string | null) {
+  await requireAuth();
   await prisma.shoppingListItem.update({
     where: { id },
     data: { overrideQuantityText: overrideQuantityText?.trim() || null },
@@ -232,6 +240,7 @@ export async function setItemQuantityOverride(id: string, overrideQuantityText: 
 // Never the other direction, unticking doesn't undo it, that's the pantry
 // screen's own job if someone actually used it up again already.
 export async function toggleShoppingItemChecked(id: string, checked: boolean) {
+  await requireAuth();
   const item = await prisma.shoppingListItem.update({
     where: { id },
     data: { checked },
@@ -252,6 +261,7 @@ export async function toggleShoppingItemChecked(id: string, checked: boolean) {
 // deleting a want-it-gone-for-good item means also dropping the recipe
 // selection or the pantry's low-stock flag that's generating it.
 export async function deleteShoppingItem(id: string): Promise<ShoppingListItemData[]> {
+  await requireAuth();
   await prisma.shoppingListItem.delete({ where: { id } });
   revalidatePath("/shopping-list");
   return getShoppingListItems();
@@ -269,6 +279,7 @@ export async function clearTickedItems(
   itemPrices: Record<string, number | null>,
   totalSpent: number | null = null
 ) {
+  await requireAuth();
   const ticked = await prisma.shoppingListItem.findMany({
     where: { checked: true },
     select: {
@@ -333,6 +344,7 @@ export type MonthlyShoppingSummary = {
 };
 
 export async function getShoppingTripsForMonth(monthStart: Date): Promise<MonthlyShoppingSummary> {
+  await requireAuth();
   const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
   const [rows, recentPriced] = await Promise.all([
     prisma.shoppingTrip.findMany({
@@ -390,6 +402,7 @@ export type ShoppingListCostEstimate = {
 // built from each unbought item's own most recent known price, not
 // everyone's shopping averaged together.
 export async function getShoppingListCostEstimate(): Promise<ShoppingListCostEstimate> {
+  await requireAuth();
   const toBuy = await prisma.shoppingListItem.findMany({
     where: { checked: false },
     select: { ingredientId: true },
@@ -447,6 +460,7 @@ export async function saveShoppingTrip(input: {
   totalSpent: number | null;
   items: TripItemInput[];
 }) {
+  await requireAuth();
   const items = await Promise.all(
     input.items
       .filter((i) => i.name.trim())
@@ -479,6 +493,7 @@ export type ReceiptScanResult = {
 // here, this only returns a draft for the same review editor manual entry
 // uses, saveShoppingTrip does the actual write once it's confirmed.
 export async function parseReceiptImage(formData: FormData): Promise<ReceiptScanResult> {
+  await requireAuth();
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file provided.");
 
@@ -511,6 +526,7 @@ export async function updateShoppingTrip(
   id: string,
   input: { date: string; totalSpent: number | null; items: TripItemInput[] }
 ) {
+  await requireAuth();
   const items = await Promise.all(
     input.items
       .filter((i) => i.name.trim())
@@ -538,6 +554,7 @@ export async function updateShoppingTrip(
 }
 
 export async function deleteShoppingTrip(id: string) {
+  await requireAuth();
   await prisma.shoppingTrip.delete({ where: { id } });
   revalidatePath("/shopping-list/tracker");
 }
@@ -549,6 +566,7 @@ export async function deleteShoppingTrip(id: string) {
 // independent recipe selection, wiping the latter would be a surprising
 // side effect of planning a week.
 export async function addRecipesToShoppingList(recipeIds: string[]): Promise<number> {
+  await requireAuth();
   const merged = await mergeMissingIngredients(recipeIds);
   let nextNewSortOrder = await nextSortOrder();
   let added = 0;

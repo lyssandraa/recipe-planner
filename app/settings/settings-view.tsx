@@ -9,6 +9,7 @@ import {
   type BackupSummary,
 } from "@/lib/backup";
 import { exportBackup, importBackup, type ImportResult } from "./actions";
+import { logout } from "@/app/login/actions";
 import { useToast } from "@/app/components/toast-provider";
 
 function downloadJson(data: unknown, filename: string) {
@@ -193,6 +194,21 @@ export default function SettingsView() {
             entries.
           </div>
         )}
+      </div>
+
+      <div className="rounded-2xl border-b-[3px] border-border-soft bg-card p-4 shadow-sm">
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-base leading-none">🔒</span>
+          <h2 className="text-[11px] font-bold tracking-wide text-green-deep uppercase">Account</h2>
+        </div>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="w-full rounded-[12px] border border-border-soft px-4 py-2.5 text-sm font-medium text-ink-soft"
+          >
+            Log out
+          </button>
+        </form>
       </div>
     </div>
   );

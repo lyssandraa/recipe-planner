@@ -8,6 +8,7 @@ import { getPantryStockSets } from "@/lib/pantryStock";
 import { planWeek, pickForSlot, type PlannerRecipe, type PlannerSlotInput } from "@/lib/planner";
 import { addDays } from "@/lib/week";
 import { addRecipesToShoppingList } from "@/app/shopping-list/actions";
+import { requireAuth } from "@/lib/auth";
 
 function revalidatePlannerSurfaces() {
   revalidatePath("/planner");
@@ -131,6 +132,7 @@ export async function generatePlan(
   mealPlanId: string,
   targets?: { lowEffortTarget: number; batchTarget: number }
 ) {
+  await requireAuth();
   if (targets) {
     await prisma.mealPlan.update({
       where: { id: mealPlanId },
@@ -184,6 +186,7 @@ export async function generatePlan(
 // vetoes make progress), plus every recipe already placed elsewhere this
 // week.
 export async function regenerateSlot(entryId: string) {
+  await requireAuth();
   const entry = await prisma.mealPlanEntry.findUniqueOrThrow({ where: { id: entryId } });
   const plan = await prisma.mealPlan.findUniqueOrThrow({
     where: { id: entry.mealPlanId },
@@ -246,12 +249,14 @@ export async function regenerateSlot(entryId: string) {
 }
 
 export async function togglePin(entryId: string, pinned: boolean) {
+  await requireAuth();
   await prisma.mealPlanEntry.update({ where: { id: entryId }, data: { pinned } });
   revalidatePath("/planner");
 }
 
 // Manual swap. Passing null clears the slot back to empty.
 export async function setSlotRecipe(entryId: string, recipeId: string | null) {
+  await requireAuth();
   await prisma.mealPlanEntry.update({
     where: { id: entryId },
     data: { recipeId, isLeftover: false, leftoverOfEntryId: null, cookedAt: null },
@@ -264,6 +269,7 @@ export async function setSlotRecipe(entryId: string, recipeId: string | null) {
 // there, including whatever the shopping list's own "add from a recipe"
 // picker has separately selected.
 export async function sendWeekToShoppingList(mealPlanId: string): Promise<number> {
+  await requireAuth();
   const plan = await prisma.mealPlan.findUniqueOrThrow({
     where: { id: mealPlanId },
     include: { entries: true },
@@ -280,6 +286,7 @@ export async function sendWeekToShoppingList(mealPlanId: string): Promise<number
 // given stock is qualitative here, not a quantity, treating "cooked a
 // recipe that uses this" as using some of it up.
 export async function markSlotCooked(entryId: string) {
+  await requireAuth();
   const entry = await prisma.mealPlanEntry.findUniqueOrThrow({
     where: { id: entryId },
     include: {

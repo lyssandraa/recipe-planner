@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { IngredientCategory, StockLevel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { guessCategory } from "@/lib/guessCategory";
+import { requireAuth } from "@/lib/auth";
 
 function revalidateShoppingSurfaces() {
   revalidatePath("/pantry");
@@ -20,6 +21,7 @@ function revalidateShoppingSurfaces() {
 // in the shopping list's "Might need soon" section, which reads pantry
 // state live rather than being stored as a row here.
 export async function setStockLevel(ingredientId: string, level: StockLevel) {
+  await requireAuth();
   await prisma.pantryItem.upsert({
     where: { ingredientId },
     update: { stockLevel: level },
@@ -48,6 +50,7 @@ export async function setStockLevel(ingredientId: string, level: StockLevel) {
 }
 
 export async function createPantryIngredient(name: string, category?: IngredientCategory) {
+  await requireAuth();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Ingredient name is required.");
 
@@ -72,6 +75,7 @@ export async function createPantryIngredient(name: string, category?: Ingredient
 // controls just send the reordered id list rather than computing swapped
 // values themselves.
 export async function reorderIngredients(orderedIds: string[]) {
+  await requireAuth();
   await prisma.$transaction(
     orderedIds.map((id, index) =>
       prisma.ingredient.update({ where: { id }, data: { sortOrder: index } })
@@ -84,6 +88,7 @@ export async function updateIngredientCategory(
   ingredientId: string,
   category: IngredientCategory
 ) {
+  await requireAuth();
   await prisma.ingredient.update({ where: { id: ingredientId }, data: { category } });
   revalidatePath("/pantry");
 }
@@ -92,6 +97,7 @@ export async function updateIngredientCategory(
 // setting "Unsalted Butter" to satisfy ["Butter"] means having unsalted
 // butter well stocked covers "butter" too, in matching and shopping lists.
 export async function setIngredientSatisfies(ingredientId: string, satisfiesIds: string[]) {
+  await requireAuth();
   await prisma.ingredient.update({
     where: { id: ingredientId },
     data: { satisfies: { set: satisfiesIds.map((id) => ({ id })) } },
@@ -104,6 +110,7 @@ export async function updateIngredientStorageAdvice(
   ingredientId: string,
   advice: string | null
 ) {
+  await requireAuth();
   await prisma.ingredient.update({
     where: { id: ingredientId },
     data: { storageAdvice: advice?.trim() || null },

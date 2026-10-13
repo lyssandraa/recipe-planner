@@ -7,8 +7,10 @@ import {
   type BackupFile,
   type BackupRecipe,
 } from "@/lib/backup";
+import { requireAuth } from "@/lib/auth";
 
 export async function exportBackup(): Promise<BackupFile> {
+  await requireAuth();
   const [ingredients, ingredientInfos, recipes, pantryItems, shoppingItems, cookLogs, products] =
     await Promise.all([
       prisma.ingredient.findMany({
@@ -174,6 +176,7 @@ export type ImportResult = {
 // upserts; pantry/cook log/shopping list/snapshots skip rows that already
 // look identical rather than piling up duplicates on a repeat import.
 export async function importBackup(file: BackupFile): Promise<ImportResult> {
+  await requireAuth();
   // Pass 1: ingredients (everything else references these by name).
   for (const ing of file.ingredients) {
     await prisma.ingredient.upsert({

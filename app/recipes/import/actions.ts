@@ -8,6 +8,7 @@ import { extractPdfText } from "@/lib/import/pdfText";
 import { parseRecipeText } from "@/lib/import/parseRecipeText";
 import { resolveIngredientId } from "@/lib/resolveIngredient";
 import { serializeInstructions } from "@/lib/instructions";
+import { requireAuth } from "@/lib/auth";
 
 export type ImportedIngredientRow = ParsedRecipeDraft["ingredients"][number] & {
   matchedIngredientId: string | null;
@@ -21,6 +22,7 @@ export type ImportPreview = Omit<ParsedRecipeDraft, "ingredients"> & {
 // against the canonical ingredient catalog (same matcher the scanner uses).
 // Nothing is written to the database here.
 export async function parseRecipeFromUrl(url: string): Promise<ImportPreview> {
+  await requireAuth();
   const draft = await parseRecipe(url);
   const ingredients = await Promise.all(
     draft.ingredients.map(async (ing) => ({
@@ -36,6 +38,7 @@ export async function parseRecipeFromUrl(url: string): Promise<ImportPreview> {
 // heading/line heuristics as a plain-text import. Only works for a PDF with
 // a real embedded text layer, a scanned/photographed page has none.
 export async function parseRecipeFromPdf(formData: FormData): Promise<ImportPreview> {
+  await requireAuth();
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file provided.");
 
@@ -81,6 +84,7 @@ export type SaveImportedRecipeInput = {
 // The only place an import actually touches the database, and only once
 // the user has reviewed and confirmed it on the review screen.
 export async function saveImportedRecipe(input: SaveImportedRecipeInput) {
+  await requireAuth();
   const recipe = await prisma.recipe.create({
     data: {
       title: input.title,
